@@ -59,6 +59,7 @@ slides" and "M6: AI helper and quizzes":
 | Sync step 2: classes, lectures, quizzes and notes between devices | #105 | Nathan's Claude | server: `sync/` (schema step 3, `/api/keyring`, `/api/changes`), `tests/sync/`; app: `src/db/store.ts` and `schema.ts` (step 8: change-log indexes), `src/sync/`, Settings and setup | **Done** (server PR #106, app this PR). Slide PDFs are step 3 |
 | Sync step 3: slide PDFs on demand | #108 | Nathan's Claude | `sync/` (schema step 4, `/api/files/`), `getSlideDeckFile`/`Pages` in `src/db/lectures.ts`, `src/db/sync.ts`, `src/sync/engine.ts`, `SyncRunner.tsx`, tests | **Done** (PR #109) |
 | Phone slide page: just the slides | #110 | Nathan's Claude | `src/App.tsx`, `src/ui/SlidesScreen.tsx`, `src/viewer/SlideViewer.tsx`, `src/app.css`, `src/viewer/viewer.css`, tests | **Done** (this PR) |
+| CI: tests side by side, no second run on main, images built alongside | #112 | Nathan's Claude | `.github/workflows/publish.yml`, its line in `CLAUDE.md` | **Done** (this PR) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -135,6 +136,8 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 22 (#112):** **CI is faster.** The unit tests and the browser tests (4 shards) run side by side, and the three images are built and checked alongside them, pushed under the commit only; a `publish` job moves the three `:main` tags once the tests passed. A push to main that merges a PR with exactly the same files, whose run passed, skips the tests (the `gate` job). The same change on Nathan's chess repo took a PR run from ~210 s to 98 s and the main run from ~200 s to 53 s. Local `npm test` is unchanged.
 
 - **Nov 21 (#110):** **Slides on a phone are just the slides.** After using synced slides on his iPhone, Nathan found the bar cluttered and jumpy ("This section" turning into the longer "Outside this section" pushed zoom, Whole page and Notes onto another row). On touch screens the Slides page now drops the header, footer, step and zoom buttons and the section label: one line with the back link and Whole page / Notes, then the slides and thumbnails. The computer keeps everything; its section label keeps one width. Tests: a new one on all three devices; phones' older tests use thumbnails and keys; 7 deliberate breaks caught.
 
