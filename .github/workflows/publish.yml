@@ -1,6 +1,11 @@
-# Tests every pull request and every push to main. On main it also builds and publishes the image
-# ghcr.io/nandminc/aw-study:main. When the green tick appears on the commit, press "Update from
-# GitHub" at https://apps.pacificfish.ca and the server deploys exactly that image.
+# Tests every pull request and every push to main. On main it also builds and publishes the images
+# ghcr.io/nandminc/aw-study:main (and -ai, -sync). When the green tick appears on the commit, press
+# "Update from GitHub" at https://apps.pacificfish.ca and the server deploys exactly that image.
+#
+# Fast on purpose (#112): the tests run side by side (unit, and the browser tests in 4 shards); the
+# images are built and checked alongside them and pushed under the commit only; the publish job
+# moves the three :main tags once the tests passed. A push to main that merges a PR whose files are
+# exactly the merged result, and whose run passed, skips the tests (the gate job): they already ran.
 name: Test and publish
 
 on:
@@ -12,15 +17,63 @@ on:
 permissions:
   contents: read
   packages: write
+  actions: read # the gate looks up the PR's run
 
 concurrency: # a newer push cancels an older run of the same branch still going
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20 # a normal run takes about 2 minutes; a hang fails here instead of running for hours
+    timeout-minutes: 5
+    outputs:
+      tested: ${{ steps.check.outputs.tested }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2 # the merge commit and both its parents
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tested=false
+          if [ "$GITHUB_EVENT_NAME" = push ] && pr=$(git rev-parse -q --verify 'HEAD^2') \
+             && [ "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse 'HEAD^2^{tree}')" ]; then
+            passed=$(gh run list -R "$GITHUB_REPOSITORY" --workflow publish.yml --commit "$pr" --event pull_request \
+                     --status success --json databaseId --jq length)
+            if [ "${passed:-0}" -gt 0 ]; then tested=true; fi
+            echo "Merged PR head $pr has the same files; passing PR runs: ${passed:-0}"
+          fi
+          echo "tested=$tested" >> "$GITHUB_OUTPUT"
+          echo "Already tested: $tested"
+
+  # Unit tests (vitest, incl. the server, helper and sync tests). The type check runs in the
+  # browsers job's build (tsc --noEmit).
+  unit:
+    needs: gate
+    if: needs.gate.outputs.tested != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:unit
+
+  # The browser tests (desktop, Android, iPhone), in 4 shards on 4 machines
+  browsers:
+    needs: gate
+    if: needs.gate.outputs.tested != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20 # a hang fails here instead of running for hours
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # Playwright's own image: Chromium (desktop, Android) and WebKit (iPhone) and every system library
     # they need are already inside, so nothing is downloaded from Ubuntu's package mirrors (installing
     # them hung twice on Nov 18). Its version must equal @playwright/test's in package.json: when you
@@ -37,12 +90,17 @@ jobs:
       - run: npm ci
       - name: Check the image matches the installed Playwright
         run: test "$(node -p "require('@playwright/test/package.json').version")" = "1.65.1"
-      - run: npm test
+      - run: npm run build
+      - run: npx playwright test --shard=${{ matrix.shard }}/4
 
+  # The app's image. On a pull request only built, to prove the Dockerfile works; on main pushed under
+  # the commit, and :main moved in publish once the tests passed
   image:
-    needs: test # a broken push never becomes an image
+    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      image: ${{ steps.name.outputs.image }}
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v4
@@ -55,15 +113,12 @@ jobs:
       # Image names must be lowercase: NandMinc/AW-Study -> ghcr.io/nandminc/aw-study
       - id: name
         run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      # On a pull request the image is only built, to prove the Dockerfile works; on main it's published
       - uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
-          tags: |
-            ${{ steps.name.outputs.image }}:main
-            ${{ steps.name.outputs.image }}:${{ github.sha }}
+          tags: ${{ steps.name.outputs.image }}:${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -71,12 +126,14 @@ jobs:
           cache-to: type=gha,mode=max
 
   # The AI helper (helper/, #27): its own image, ghcr.io/nandminc/aw-study-ai. Its tests run in the
-  # test job above (tests/helper/, with a fake claude). Here: build it, start it locked down the way
-  # the server runs it, check it answers, and on main publish it.
+  # unit job (tests/helper/, with a fake claude). Here: build it, start it locked down the way the
+  # server runs it, check it answers, and on main push it under the commit (publish moves :main).
   helper-image:
-    needs: test
+    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      image: ${{ steps.name.outputs.image }}
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v4
@@ -110,29 +167,29 @@ jobs:
           docker exec helper claude --version
           docker logs helper
           docker rm -f helper
-      - name: Publish
+      - name: Push under the commit
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: helper
           platforms: linux/amd64
           push: true
-          tags: |
-            ${{ steps.name.outputs.image }}:main
-            ${{ steps.name.outputs.image }}:${{ github.sha }}
+          tags: ${{ steps.name.outputs.image }}:${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=helper
 
   # The sync server (sync/, #95): its own image, ghcr.io/nandminc/aw-study-sync. Its tests run in the
-  # test job above (tests/sync/, with a fake Google). Here: build it, start it locked down the way the
+  # unit job (tests/sync/, with a fake Google). Here: build it, start it locked down the way the
   # server runs it (read-only, as the TrueNAS apps user, /data its only writable folder), check it
-  # answers and refuses what it must, and on main publish it.
+  # answers and refuses what it must, and on main push it under the commit (publish moves :main).
   sync-image:
-    needs: test
+    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      image: ${{ steps.name.outputs.image }}
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v4
@@ -171,17 +228,38 @@ jobs:
           test -s data/sync.db
           docker logs sync
           docker rm -f sync
-      - name: Publish
+      - name: Push under the commit
         if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: sync
           platforms: linux/amd64
           push: true
-          tags: |
-            ${{ steps.name.outputs.image }}:main
-            ${{ steps.name.outputs.image }}:${{ github.sha }}
+          tags: ${{ steps.name.outputs.image }}:${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=sync
+
+  # Moves the three :main tags to this commit's images, together, once the tests passed (or were
+  # rightly skipped by the gate) and every image was built and checked. A broken push never becomes :main.
+  publish:
+    needs: [gate, unit, browsers, image, helper-image, sync-image]
+    if: >-
+      always() && github.event_name != 'pull_request' &&
+      needs.image.result == 'success' && needs.helper-image.result == 'success' && needs.sync-image.result == 'success' &&
+      (needs.gate.outputs.tested == 'true' || (needs.unit.result == 'success' && needs.browsers.result == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Move :main to this commit's images
+        run: |
+          for image in "${{ needs.image.outputs.image }}" "${{ needs.helper-image.outputs.image }}" "${{ needs.sync-image.outputs.image }}"; do
+            docker buildx imagetools create -t "$image:main" "$image:${{ github.sha }}"
+          done

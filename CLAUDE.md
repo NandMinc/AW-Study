@@ -148,7 +148,10 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   import `test` and `expect` from `tests/browsers/fixtures.ts`, not '@playwright/test' (it keeps WebKit pages
   drawing under load, #81).
 - `.github/workflows/publish.yml`: tests every PR and push; on `main` publishes
-  `ghcr.io/nandminc/aw-study:main`, which the home server deploys when someone presses Update.
+  `ghcr.io/nandminc/aw-study:main` (and `-ai`, `-sync`), which the home server deploys when someone
+  presses Update. Tests run side by side (`unit`, `browsers` in 4 shards); images are built alongside
+  and `publish` moves `:main` after the tests pass; a merge of an already-tested PR skips the tests
+  (`gate`, #112). A new test file needs nothing: the shards split whatever Playwright finds.
 
 ## Rules
 
