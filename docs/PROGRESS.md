@@ -158,6 +158,12 @@ the "Test and publish" run on `main` to finish, then press Update.
   each mark, its feedback and a full answer's points; a failed marking offers Try marking again or Save without them, never a
   made-up mark. Also: the results' percentage is now the weighted score (`describeScore(right, asked, score)`; since #120 it had
   still shown the plain one). Exam practice is unchanged. 9 deliberate breaks, all caught. **The exam style plan (#117) is built.**
+- **Nov 23 (#139):** Fixed a flaky test, `quiz.spec.ts` "locking stops the background work". Since #123, making
+  questions asks `/ai/style` before `/ai/questions`, and the test locked as soon as it saw "Making quiz questions":
+  under load that was still the guide step, so no questions request was ever sent and the test waited for one forever.
+  It now waits for the questions request before locking, with `/ai/style` slowed in the test so that path always runs
+  (with the slow step and no wait it failed every time; with the wait, 12 of 12 on all three devices).
+
 - **Nov 22 (#123):** Quizzes by level. A section's stage (new: first week or last score under 70%; known: last two 90%+ and no
   exam-style question missed in the last; exam: in an exam's run-up; learning otherwise) sets each quiz's levels
   (`RULES.levels.stageShares`), a known quiz always has one exam-style question (the anchor), a level short of questions borrows from
