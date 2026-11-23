@@ -62,7 +62,7 @@ slides" and "M6: AI helper and quizzes":
 | CI: tests side by side, no second run on main, images built alongside | #112 | Nathan's Claude | `.github/workflows/publish.yml`, its line in `CLAUDE.md` | **Done** (this PR) |
 | AI questions stand on their own (no "this diagram"), with worked problems | #115 | Nathan's Claude | the question prompts and `refersToUnseen` in `helper/jobs.mjs`, `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (this PR). Live once `honed-ai` is updated; banks made before keep their old questions |
 | Design: exam style guide per class, question levels, short answers in quizzes | #117 | Nathan's Claude | `docs/DESIGN.md` ("Exam style and question levels", the Quizzes decision, two open questions) | **Done** (PR #119, Matt's OK); built in #120-#124. Scores weighted by level; "File types to support" list (Nathan, Nov 22) |
-| Exam style 1: contract and storage | #120 | Nathan's Claude | new `src/types/style.ts`; `Level`, `ChoiceQuestion`/`ShortQuestion`, `ShortAnswer`, the weighted score in `src/types/quiz.ts`; `src/db/quiz.ts` (forms, levels, short answers, weighted score); `pickQuiz` multiple choice only for now; then the materials and guide storage in `src/db/` and sync | Contract and quiz storage **this PR**; materials and guide storage next |
+| Exam style 1: contract and storage | #120 | Nathan's Claude | new `src/types/style.ts`; `Level`, `ChoiceQuestion`/`ShortQuestion`, `ShortAnswer`, the weighted score in `src/types/quiz.ts`; `src/db/quiz.ts` (forms, levels, short answers, weighted score); `pickQuiz` multiple choice only for now; then the materials and guide storage in `src/db/` and sync | Contract and quiz storage **done** (PR #126); materials and guide storage **this PR** (schema step 9, `src/db/style.ts`, sync incl. the sync server) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -146,6 +146,13 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 22 (#120, part 2):** Exam style storage. Schema step 9: `materials`, `materialFiles` (raw bytes, like `deckFiles`),
+  `materialPages`, `examStyles` (one per class, under `examStyleId` = `style-<class id>`, not the class's own id: sync finds a
+  record's latest change by id alone, so sharing it made the class's and its style's changes overrule each other). `src/db/style.ts`
+  (`ExamStyleStore`); a text file's text is read from the file itself. Deleting a class takes its materials, files and style. Sync: the
+  new entities, material files over `/api/files/` like decks; the **sync server** accepts them and deletes a material's files with it
+  (**deploy honed-sync before site-honed**). Also fixed: a device's change times now always move forward (at least 1 ms each), so two
+  edits of one record in the same millisecond no longer reach other devices as a tie that kept the first. 13 deliberate breaks, all caught.
 - **Nov 22 (#120, part 1):** Exam style contract. `src/types/style.ts` (materials, notes, the guide, `ExamStyleStore`; storage next).
   Questions have `form` (`choice` | `short`) and `level` 1-3; older ones read as choice, level 2 (`withDefaults`, `isChoice`). Attempts
   record each answer's level and short answers to banked questions; `score` is weighted by level (exam practice's written answers
@@ -530,6 +537,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **Nov 17:** Skeleton merged (#2). Design merged (#1).
 
 ## Gotchas worth knowing
+
+- A record's sync id must be its own: sync finds a record's latest change by `entityId` alone (not entity and id), so two kinds of
+  record sharing an id overrule each other's changes (#120: the exam style is `style-<class id>`).
 
 - **Import `test` and `expect` from `tests/browsers/fixtures.ts`, never from '@playwright/test'.**
   Under load, a WebKit page can stop drawing frames, and Playwright's clicks then wait forever for

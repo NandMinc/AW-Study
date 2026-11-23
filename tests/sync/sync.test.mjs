@@ -813,6 +813,27 @@ describe('sync: slide files (#108)', () => {
     expect(db.prepare('SELECT COUNT(*) AS n FROM files').get().n).toBe(0);
   });
 
+  it('takes class materials and exam styles (#120); a material deleted on a device takes its files with it', async () => {
+    const b = browser();
+    await signIn(b, NATHAN);
+    await put(b, '/api/files/mat1/pdf', bytes(40));
+    await put(b, '/api/files/mat1/pages', bytes(4));
+    await put(b, '/api/files/deck2/pdf', bytes(50));
+    const at = '2026-11-22T01:00:00.000Z';
+    const changes = [
+      { id: 'c1', entity: 'examStyle', entityId: 'course1', op: 'put', at, iv: 'aaaaaaaaaaaaaaaa', ct: 'sealed' },
+      { id: 'c2', entity: 'material', entityId: 'mat1', op: 'delete', at, iv: 'aaaaaaaaaaaaaaaa', ct: 'sealed' },
+    ];
+    const res = await b.send('POST', '/api/changes', { changes });
+    expect(res.status).toBe(200);
+    expect((await res.json()).stored).toBe(2);
+    expect((await b.go('/api/files/mat1/pdf')).status).toBe(404);
+    expect((await b.go('/api/files/mat1/pages')).status).toBe(404);
+    expect((await b.go('/api/files/deck2/pdf')).status).toBe(200);
+    const account = db.prepare('SELECT id FROM accounts').get().id;
+    expect(readdirSync(join(dir, 'files', account)).sort()).toEqual(['deck2.pdf']);
+  });
+
   it('logs no file contents', async () => {
     const b = browser();
     await signIn(b, NATHAN);

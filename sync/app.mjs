@@ -47,7 +47,8 @@ export const MAX_KEYRING_BYTES = 64 * 1024;
 export const MAX_FILE_BYTES = 110 * 1024 * 1024; // a sealed 100 MB PDF (Honed's limit, and Cloudflare's upload limit) and a little
 export const MAX_ACCOUNT_FILE_BYTES = 5 * 1024 * 1024 * 1024; // in the testing phase
 const FILE_PATH = /^\/api\/files\/([\w-]{1,64})\/(pdf|pages)$/;
-const ENTITIES = new Set(['course', 'exam', 'slideDeck', 'lecture', 'section', 'question', 'quizAttempt', 'studySession', 'settings', 'annotation']);
+// material and examStyle: #120 (a class's other documents and its exam style)
+const ENTITIES = new Set(['course', 'exam', 'slideDeck', 'lecture', 'section', 'question', 'quizAttempt', 'studySession', 'settings', 'annotation', 'material', 'examStyle']);
 const ID = /^[\w-]{1,64}$/;
 const B64URL = /^[\w-]*$/;
 const TOUCH_EVERY_MS = 3_600_000; // a session's "last used" is saved at most hourly
@@ -401,7 +402,8 @@ export function createSync({ db, google, allowedEmails, appOrigin, filesDir, log
       // A deck deleted on a device: its files go too (#108). (The hint is all the server can read; at worst a
       // wrong one removes this account's own files, which the device that has them uploads again.)
       for (const c of list) {
-        if (c.entity !== 'slideDeck' || c.op !== 'delete' || !filesDir) continue;
+        // A class material's files (#120) are kept the same way, by its id
+        if ((c.entity !== 'slideDeck' && c.entity !== 'material') || c.op !== 'delete' || !filesDir) continue;
         q.deleteDeckFiles.run(s.account_id, c.entityId);
         for (const kind of ['pdf', 'pages']) await unlink(join(filesDir, s.account_id, `${c.entityId}.${kind}`)).catch(() => {});
       }
