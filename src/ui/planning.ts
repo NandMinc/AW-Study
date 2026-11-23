@@ -2,9 +2,9 @@
 // Tasks page and Play (both use `tasks`, src/plan/tasks.ts: by class, in the saved order). Everything is read fresh each time: nothing the planner works out is stored.
 import type { StudyStore } from '../db/store';
 import { deviceTimeZone, studyDay } from '../lib/studyDay';
-import { planDay, type Plan, type PlanItem } from '../plan/planner';
+import { planDay, type Plan, type PlanItem, type PracticeItem } from '../plan/planner';
 import { progress, tasksForDay, type TasksDay } from '../plan/tasks';
-import type { Course, Lecture, Section, SlideDeck } from '../types/lecture';
+import type { Course, Exam, Lecture, Section, SlideDeck } from '../types/lecture';
 import { slidesLabel } from './classes';
 import { DAY_START_HOUR } from './settings';
 
@@ -23,6 +23,8 @@ export interface Planning {
   /** StudySettings.classOrder as saved (the Tasks page keeps classes not shown today in their place). */
   classOrder: string[];
   place: (sectionId: string) => ItemPlace | undefined;
+  /** Today's exam practice (#87), with its exam and class; only the sections that can be placed. */
+  practice: { item: PracticeItem; done: boolean; exam: Exam; course: Course }[];
   /** Courses with at least one lecture: whether there's anything to plan at all. */
   hasLectures: boolean;
 }
@@ -60,9 +62,17 @@ export async function loadPlanning(store: StudyStore, now = new Date()): Promise
   const classes = day.classes
     .map((c) => ({ ...c, items: c.items.filter((t) => place(t.item.sectionId)) }))
     .filter((c) => c.items.length > 0);
+  const examById = new Map(exams.map((e) => [e.id, e]));
+  const practice = day.practice.flatMap(({ item, done }) => {
+    const exam = examById.get(item.examId);
+    const course = courseById.get(item.courseId);
+    const sectionIds = item.sectionIds.filter((id) => place(id));
+    return exam && course && sectionIds.length > 0 ? [{ item: { ...item, sectionIds }, done, exam, course }] : [];
+  });
   return {
     today,
     plan,
+    practice,
     tasks: { ...day, classes, progress: progress(classes.flatMap((c) => c.items)) },
     classOrder: settings.classOrder,
     hasLectures: lectures.length > 0,

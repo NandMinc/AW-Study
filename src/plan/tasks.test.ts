@@ -101,6 +101,27 @@ describe('fixed at the start of the day, ticked by quizzes', () => {
   });
 });
 
+describe('exam practice (#87)', () => {
+  // History's final is the day after tomorrow: practice is offered today
+  const final = { id: 'final', courseId: 'hist', title: 'Final', kind: 'final' as const, date: '2026-11-19', lectureIds: null, createdAt: at('2026-10-01'), updatedAt: at('2026-10-01') };
+  const practiced = (when: string): QuizAttempt => ({ ...quizzed(hist, when, 0.8), examId: final.id });
+
+  it('on the list from the start of the day, ticked once a practice for that exam is saved today', () => {
+    const before = day({ exams: [final] });
+    expect(before.practice.map((p) => [p.item.examId, p.item.sectionIds, p.done])).toEqual([['final', [hist.id], false]]);
+    const after = day({ exams: [final], attempts: [practiced(TODAY)] });
+    expect(after.practice.map((p) => p.done)).toEqual([true]); // still there, ticked
+    expect(shape(after)).toEqual(['hist:done:✓', 'bio:new:·']); // and, as a quiz on its section, ticks History's review (DESIGN)
+    expect(day({ exams: [final], attempts: [quizzed(hist, TODAY, 0.9)] }).practice.map((p) => p.done)).toEqual([false]); // a plain quiz isn't practice
+  });
+
+  it('a practice done yesterday, in its 2 days, takes it off today’s list; one from before them doesn’t', () => {
+    const tomorrow = { ...final, date: '2026-11-18' }; // its practice days are Nov 16 and 17
+    expect(day({ exams: [tomorrow], attempts: [practiced('2026-11-16')] }).practice).toEqual([]);
+    expect(day({ exams: [final], attempts: [practiced('2026-11-16')] }).practice.map((p) => p.done)).toEqual([false]); // Nov 19's start on the 17th
+  });
+});
+
 describe('statuses', () => {
   it('“Exam soon” within 7 days, before New and Review; done comes before all', () => {
     expect(shape(day({ nextExam: { hist: '2026-11-24', bio: '2026-11-25' } }))).toEqual(['bio:new:·', 'hist:exam-soon:·']); // 7 and 8 days

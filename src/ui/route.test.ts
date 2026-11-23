@@ -16,6 +16,8 @@ describe('parseRoute', () => {
     expect(parseRoute('#/class/c1/quiz/s-1')).toEqual({ name: 'quiz', courseId: 'c1', sectionId: 's-1' });
     expect(parseRoute('#/class/c1/quiz/s-1/compare')).toEqual({ name: 'quiz', courseId: 'c1', sectionId: 's-1', compare: true });
     expect(parseRoute('#/play')).toEqual({ name: 'play' });
+    expect(parseRoute('#/practice/e-1')).toEqual({ name: 'practice', examId: 'e-1' });
+    expect(parseRoute('#/practice/')).toEqual({ name: 'not-found' });
     expect(parseRoute('#/settings')).toEqual({ name: 'settings' });
   });
 
@@ -62,6 +64,7 @@ describe('parseRoute', () => {
       { name: 'quiz', courseId: 'c1', sectionId: 's1' },
       { name: 'quiz', courseId: 'c1', sectionId: 's1', compare: true },
       { name: 'play' },
+      { name: 'practice', examId: 'e1' },
       { name: 'settings' },
     ];
     for (const route of routes) expect(parseRoute(href(route))).toEqual(route);
