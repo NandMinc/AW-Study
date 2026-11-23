@@ -61,7 +61,7 @@ slides" and "M6: AI helper and quizzes":
 | Phone slide page: just the slides | #110 | Nathan's Claude | `src/App.tsx`, `src/ui/SlidesScreen.tsx`, `src/viewer/SlideViewer.tsx`, `src/app.css`, `src/viewer/viewer.css`, tests | **Done** (this PR) |
 | CI: tests side by side, no second run on main, images built alongside | #112 | Nathan's Claude | `.github/workflows/publish.yml`, its line in `CLAUDE.md` | **Done** (this PR) |
 | AI questions stand on their own (no "this diagram"), with worked problems | #115 | Nathan's Claude | the question prompts and `refersToUnseen` in `helper/jobs.mjs`, `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (this PR). Live once `honed-ai` is updated; banks made before keep their old questions |
-| Design: exam style guide per class, question levels, short answers in quizzes | #117 | Nathan's Claude | `docs/DESIGN.md` ("Exam style and question levels", the Quizzes decision, two open questions) | **Design PR open**, waiting for Matt's OK; built in five later issues |
+| Design: exam style guide per class, question levels, short answers in quizzes | #117 | Nathan's Claude | `docs/DESIGN.md` ("Exam style and question levels", the Quizzes decision, two open questions) | **Design PR open**, waiting for Matt's OK; built in five later issues. Scores weighted by level; "File types to support" list (Nathan, Nov 22) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones

@@ -204,6 +204,11 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   are created and installed by Matt and Nathan themselves, never by a Claude.
 - Questions must be checked before use: four options, one right answer among them, a slide number.
 
+**File types**
+- Honed reads PDFs and plain text today. Whenever a new file type comes up (a user's file, a request, a
+  design), add it to "File types to support" in `docs/DESIGN.md` with where it came up. Don't build
+  support for it until it's been worked through there (Nathan, Nov 22).
+
 ## Hosting
 
 The home server runs the image as a TrueNAS app (named when the server side is added), with its
