@@ -61,6 +61,7 @@ slides" and "M6: AI helper and quizzes":
 | Phone slide page: just the slides | #110 | Nathan's Claude | `src/App.tsx`, `src/ui/SlidesScreen.tsx`, `src/viewer/SlideViewer.tsx`, `src/app.css`, `src/viewer/viewer.css`, tests | **Done** (this PR) |
 | CI: tests side by side, no second run on main, images built alongside | #112 | Nathan's Claude | `.github/workflows/publish.yml`, its line in `CLAUDE.md` | **Done** (this PR) |
 | AI questions stand on their own (no "this diagram"), with worked problems | #115 | Nathan's Claude | the question prompts and `refersToUnseen` in `helper/jobs.mjs`, `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (this PR). Live once `honed-ai` is updated; banks made before keep their old questions |
+| Design: exam style guide per class, question levels, short answers in quizzes | #117 | Nathan's Claude | `docs/DESIGN.md` ("Exam style and question levels", the Quizzes decision, two open questions) | **Design PR open**, waiting for Matt's OK; built in five later issues. Scores weighted by level; "File types to support" list (Nathan, Nov 22) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -85,6 +86,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Decisions (newest first)
 
+- **Nov 22: Exam style and question levels** (Nathan, #117, design): each class keeps an AI-written exam style guide from
+  its slides, uploaded materials and the student's notes; questions get levels 1-3; well-known sections get easy questions,
+  new ones exam-style ones; regular quizzes may include short answers (at most two sentences), AI-marked in one request.
 - **Nov 22: Questions stand on their own** (Nathan, #115): an expert on the subject who has never seen the slides must be able
   to score perfectly. Questions never refer to the slides, the lecture or a picture (the AI only gets slide text, never
   the pictures), and include worked problems ("Solve ...", wrong options = common mistakes) where the material allows.
@@ -141,6 +145,8 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 22 (#117):** Design for exam style guides, question levels and short answers in quizzes (DESIGN, "Exam style and
+  question levels"). Nothing built yet; five build steps listed there.
 - **Nov 22 (#115):** Both question prompts (`questions`, `written`) gain the stand-on-its-own rule and worked problems. The helper
   drops any question (or option) that still points at unseen material ("this diagram", "according to the slide", "slide 4",
   "shown above"; narrow, so "the periodic table" and "the image of 2 under f" pass) before trimming to the count, and retries
