@@ -9,8 +9,8 @@ log). The design is in `DESIGN.md`; how we work together is in `../CLAUDE.md` ("
 Milestones 3 to 7 and 9 are **done** (9, exams, on Nov 22: #86, #87). The restyle is finished, and so are
 accounts and sync (#93-#108). Now: **exam style and question levels** (DESIGN, #117), in five steps:
 contract and storage #120, the helper #121 and the class page #122 are **done**; next the bank and planner
-#123, and the quiz screen #124. Milestone 8 (first run and after-class prompts): the after-class reminder is #129 (ask when the app opens,
-Matt's choice, Nov 22).
+#123, and the quiz screen #124. Milestone 8 (first run and after-class prompts): the after-class reminder is **done** (#129); the first-run
+tutorial isn't started.
 
 Milestone 3, **Lock it down** (done): encryption, the recovery key, persistent storage, backup and
 restore, in the GitHub milestone "M3: Lock it down".
@@ -67,7 +67,7 @@ slides" and "M6: AI helper and quizzes":
 | Exam style 2: helper | Exam style 4: bank, picking and planner by level | #123 | Nathan's Claude | new `src/quiz/levels.ts` (+ test), `RULES.levels`, `src/quiz/bank.ts`, `src/quiz/pick.ts`, the stage and timing in `src/plan/planner.ts` and `tasks.ts`, the stage in `PlayScreen`/`QuizScreen`, the guide before questions in `bank-jobs.tsx`/`QuizScreen`, `answerStyle` in `tests/browsers/fixtures.ts`, `tests/browsers/levels.spec.ts` | **Done** (this PR) |
 jobs (`style`, `grade-many`, levels and forms in `questions`) | #121 | Matt's Claude | `helper/jobs.mjs`, `tests/helper/`, `src/ai/` (backend, http, fake, check, new `style.ts`), the filter in `CompareModels.tsx` | **Done** (PR #127). **The helper changed: press Update for `honed-ai`** |
 | Exam style 3: the class page's Exam style (documents, notes, the guide) | #122 | Matt's Claude | new `src/ui/ExamStyleSection.tsx`, `src/quiz/guide.ts`, `readMaterialFile` in `src/ui/pdf-file.ts`, the `style` part in `route.ts` and `ClassMenu.tsx`, its place in `ClassScreen.tsx`, the exam style styles, `tests/browsers/exam-style.spec.ts` | **Done** (PR #130) |
-| After-class reminder: a popup when Honed opens links to the lecture to fill in | #129 | (free) | new `src/ui/AfterClass.tsx`, the reminder logic in `src/ui/classes.ts`, `src/App.tsx` | Not started. Matt's choice (Nov 22): ask when the app opens, not push |
+| After-class reminder: a popup when Honed opens links to the lecture to fill in | #129 | Matt's Claude | new `src/ui/AfterClass.tsx` and `src/ui/after-class.ts` (+ tests), its place in `src/App.tsx`, `tests/browsers/after-class.spec.ts` | **Done** (PR #132). Try on a real phone after deploy |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -160,6 +160,13 @@ the "Test and publish" run on `main` to finish, then press Update.
   default `/ai/style` answer (`answerStyle` in fixtures.ts). Planner tests' minutes updated to the new times (one budget raised from
   30 to 35 to keep its point). 11 deliberate breaks, all caught (two only after making them compile: a build that fails leaves the
   old build in place, so a browser break must build).
+- **Nov 22 (#129):** **After-class reminder.** When Honed opens or comes back into view on Tasks, Classes or Settings,
+  a popup lists lectures that have ended in the last 7 days since the class was added and aren't filled in, each
+  linking to its "What was covered?". Later, Escape or a tap outside puts them off until tomorrow (localStorage);
+  following a link counts as seen. Not about lectures from before a class was added: those are the Classes page's
+  date buttons, and popping them up at once would greet every new class with its past week. WebKit caught Escape
+  being lost (see Gotchas). 15 deliberate breaks, all caught.
+
 - **Nov 22 (#133):** Claims go through `tools/claim-task.mjs` (reads comments and assignees, refuses if held, assigns and posts,
   backs off on a simultaneous claim; `--check`, `--release`). Why: Nathan's Claude claimed #121 and #122 minutes after Matt's
   Claude without reading the comments, and built #122 a second time (#131). Nathan's PC also has a Claude Code hook that blocks
@@ -584,6 +591,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 ## Gotchas worth knowing
 
 - Breaking code on purpose for a browser test: check the build still succeeds (`npm run build` type-checks), or the test runs the last good build and passes (#123).
+- **A popup's Escape key: add the listener in `useLayoutEffect`, not `useEffect`** (#129). `useEffect` runs after the
+  browser paints, so a test (or a quick person) can see the popup and press Escape before the listener exists.
+  WebKit lost it 5 runs in 8. The listener is added once while the popup is open, reading the current handler
+  through a ref (as for keyboard shortcuts below).
 - Claim with `tools/claim-task.mjs`, not by hand: `gh issue list` doesn't show claim comments, so a task can look free when it isn't (#133).
 - A record's sync id must be its own: sync finds a record's latest change by `entityId` alone (not entity and id), so two kinds of
   record sharing an id overrule each other's changes (#120: the exam style is `style-<class id>`).
