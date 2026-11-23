@@ -78,9 +78,10 @@ describe('levelCounts and time', () => {
 });
 
 describe('bankMix and bankNeeds', () => {
-  it('a bank holds its target in the bank shares; no short answers until the quiz asks them (#124)', () => {
-    expect(bankMix(36, 0.8)).toEqual({ choice: [9, 13, 14], short: 0 });
-    expect(bankMix(10, 0)).toEqual({ choice: [3, 3, 4], short: 0 });
+  it('a bank holds its target in the bank shares, the guide’s share of level 3 as short answers (#124)', () => {
+    expect(bankMix(36, 0.8)).toEqual({ choice: [9, 13, 3], short: 11 }); // 14 level 3: 11 short, 3 multiple choice
+    expect(bankMix(36, 0)).toEqual({ choice: [9, 13, 14], short: 0 }); // no guide, or a class that asks none
+    expect(bankMix(10, 0.5)).toEqual({ choice: [3, 3, 2], short: 2 });
   });
 
   it('needs only what each level is missing, never below 0', () => {
@@ -109,7 +110,7 @@ describe('pickQuiz by stage', () => {
     ...[...Array(l2)].map((_, i) => q(`m${i}`, 2)),
     ...[...Array(l3)].map((_, i) => q(`h${i}`, 3)),
   ];
-  const levels = (items: { question: ChoiceQuestion }[]) => [1, 2, 3].map((l) => items.filter((i) => i.question.level === l).length);
+  const levels = (items: { question: { level: Level } }[]) => [1, 2, 3].map((l) => items.filter((i) => i.question.level === l).length);
 
   it('asks each level in the stage’s shares', () => {
     expect(levels(pickQuiz(bank(10, 10, 10), [], 10, Math.random, 'new'))).toEqual([2, 3, 5]);

@@ -6,12 +6,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { StudyStore } from '../db/store';
 import { sectionStage, type Stage } from '../quiz/levels';
-import { pickQuiz, QUIZ_SIZE, type QuizItem } from '../quiz/pick';
+import { QUIZ_SIZE } from '../quiz/pick';
+import { useAi } from './ai-context';
 import type { PlanItem } from '../plan/planner';
 import type { Question, QuizAttempt } from '../types/quiz';
 import { DeckSlides } from './DeckSlides';
 import { describeItem, loadPlanning, type ItemPlace } from './planning';
 import { Quiz, Start, type Setting } from './QuizScreen';
+import { startQuiz, type StartedQuiz } from '../quiz/start';
 import { href } from './route';
 import { useStore } from './store-context';
 import { messageOf, useLoad } from './useLoad';
@@ -183,24 +185,24 @@ function PlayQuiz({ place, size, stage, onDone, last }: { place: ItemPlace; size
     ]);
     return { setting: { course: place.course, section: place.section, deck: place.deck, pageTexts } satisfies Setting, questions, attempts };
   }, [store, place.section.id]);
-  const [quiz, setQuiz] = useState<{ items: QuizItem[]; startedAt: string } | null>(null);
-  const begin = (questions: Question[], attempts: QuizAttempt[]) =>
-    setQuiz({ items: pickQuiz(questions, attempts, size, Math.random, stage ?? sectionStage(attempts)), startedAt: new Date().toISOString() });
+  const ai = useAi();
+  const [quiz, setQuiz] = useState<StartedQuiz | null>(null);
+  const begin = async (questions: Question[], attempts: QuizAttempt[]) => setQuiz(await startQuiz(ai, questions, attempts, size, stage ?? sectionStage(attempts)));
 
   // Straight into the quiz when the bank has questions
   useEffect(() => {
-    if (data && !quiz && data.questions.length > 0) begin(data.questions, data.attempts);
+    if (data && !quiz && data.questions.length > 0) void begin(data.questions, data.attempts);
   }, [data]);
 
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p className="muted">Getting the quiz ready…</p>;
   if (quiz) {
-    return <Quiz setting={data.setting} items={quiz.items} startedAt={quiz.startedAt} onAgain={onDone} doneLabel={last ? 'Finish' : 'Next'} backLink={false} />;
+    return <Quiz setting={data.setting} items={quiz.items} startedAt={quiz.startedAt} note={quiz.note} onAgain={onDone} doneLabel={last ? 'Finish' : 'Next'} backLink={false} />;
   }
   return (
     <div className="stack">
       <p>These slides have no quiz questions yet: make them now (it uses AI), or skip the quiz this time.</p>
-      <Start setting={data.setting} questions={data.questions} attempts={data.attempts} size={size} compare={false} onStart={() => begin(data.questions, data.attempts)} onBankChanged={reload} />
+      <Start setting={data.setting} questions={data.questions} attempts={data.attempts} size={size} compare={false} onStart={() => void begin(data.questions, data.attempts)} onBankChanged={reload} />
       <button type="button" onClick={onDone}>
         Skip the quiz
       </button>
