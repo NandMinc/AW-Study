@@ -1,4 +1,5 @@
-// Which screen to show, from the URL's hash: #/ (Tasks, the home page), #/classes, #/class/<id> (and
+// Which screen to show, from the URL's hash: #/ (Tasks, the home page; #/tour opens the first-run tour on it,
+// #136), #/classes (#/classes/new opens adding a class), #/class/<id> (and
 // #/class/<id>/<part>, the class's page opened at one part, from its menu on the Classes page, or
 // #/class/<id>/cover/<date>, "What was covered?" for that lecture), #/class/<id>/slides/<deckId>
 // (a deck in the viewer, optionally .../<first>-<last> for a section), #/class/<id>/quiz/<sectionId>,
@@ -13,8 +14,8 @@ export const CLASS_PARTS = ['lectures', 'details', 'exams', 'style', 'files'] as
 export type ClassPart = (typeof CLASS_PARTS)[number];
 
 export type Route =
-  | { name: 'tasks' }
-  | { name: 'classes' }
+  | { name: 'tasks'; tour?: boolean }
+  | { name: 'classes'; adding?: boolean }
   | { name: 'class'; courseId: string; part?: ClassPart; cover?: string }
   | { name: 'slides'; courseId: string; deckId: string; first?: number; last?: number }
   | { name: 'quiz'; courseId: string; sectionId: string; compare?: boolean }
@@ -27,7 +28,9 @@ const ID = '([A-Za-z0-9-]{1,64})';
 const PAGE = '([1-9][0-9]{0,3})';
 const PATTERNS: [RegExp, (m: RegExpMatchArray) => Route | null][] = [
   [/^#?\/?$/, () => ({ name: 'tasks' })],
+  [/^#\/tour$/, () => ({ name: 'tasks', tour: true })],
   [/^#\/classes$/, () => ({ name: 'classes' })],
+  [/^#\/classes\/new$/, () => ({ name: 'classes', adding: true })],
   [new RegExp(`^#/class/${ID}$`), (m) => ({ name: 'class', courseId: m[1]! })],
   [new RegExp(`^#/class/${ID}/(${CLASS_PARTS.join('|')})$`), (m) => ({ name: 'class', courseId: m[1]!, part: m[2] as ClassPart })],
   [new RegExp(`^#/class/${ID}/cover/([0-9]{4}-[0-9]{2}-[0-9]{2})$`), (m) => (validDate(m[2]!) ? { name: 'class', courseId: m[1]!, cover: m[2]! } : null)],
@@ -62,9 +65,9 @@ export function parseRoute(hash: string): Route {
 export function href(route: Exclude<Route, { name: 'not-found' }>): string {
   switch (route.name) {
     case 'tasks':
-      return '#/';
+      return route.tour ? '#/tour' : '#/';
     case 'classes':
-      return '#/classes';
+      return route.adding ? '#/classes/new' : '#/classes';
     case 'class':
       if (route.cover) return `#/class/${route.courseId}/cover/${route.cover}`;
       return route.part ? `#/class/${route.courseId}/${route.part}` : `#/class/${route.courseId}`;

@@ -6,6 +6,7 @@ import { planDay, type Plan, type PlanItem, type PracticeItem } from '../plan/pl
 import { progress, tasksForDay, type TasksDay } from '../plan/tasks';
 import type { Course, Exam, Lecture, Section, SlideDeck } from '../types/lecture';
 import { slidesLabel } from './classes';
+import type { StartProgress } from './getting-started';
 import { DAY_START_HOUR } from './settings';
 
 export interface ItemPlace {
@@ -25,6 +26,8 @@ export interface Planning {
   place: (sectionId: string) => ItemPlace | undefined;
   /** Today's exam practice (#87), with its exam and class; only the sections that can be placed. */
   practice: { item: PracticeItem; done: boolean; exam: Exam; course: Course }[];
+  /** How far along the first run is (#136): classes, lectures, any study, where to add a lecture. */
+  start: StartProgress;
   /** Courses with at least one lecture: whether there's anything to plan at all. */
   hasLectures: boolean;
 }
@@ -76,6 +79,12 @@ export async function loadPlanning(store: StudyStore, now = new Date()): Promise
     tasks: { ...day, classes, progress: progress(classes.flatMap((c) => c.items)) },
     classOrder: settings.classOrder,
     hasLectures: lectures.length > 0,
+    start: {
+      classes: courses.length,
+      lectures: lectures.length,
+      studied: sessions.length > 0 || attempts.length > 0,
+      courseId: (courses[perCourse.findIndex((p) => p.lectures.length === 0)] ?? courses[0])?.id ?? null,
+    },
     place,
   };
 }

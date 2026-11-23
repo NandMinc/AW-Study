@@ -37,6 +37,15 @@ Three moments: setting up once, telling Honed what each lecture covered, and the
 3. Add content from a class: upload a lecture's slides (PDF) and say what was covered.
 4. Offer the first study session.
 
+**Built (#136, Nov 23):** after setup, a **tour** of three cards opens by itself, once, for someone with no classes
+(not for someone whose classes came by sync or a backup): your classes (when they meet, exam dates), after each
+lecture (the slides and the part covered; the plan and the AI's questions come from them), every day (Start: the
+slides, then a quiz whose score decides when each part comes back). Back and Next; Close, Escape or a tap outside.
+Settings > Help reopens it (`#/tour`). Then **Getting started** on Tasks, three steps that tick themselves from the
+data: add a class (a link straight to adding one, `#/classes/new`), add what a lecture covered (a link to the
+class), and do a first study session or quiz. It's gone once all three are done, or after **Skip this**. "Seen" and
+"skipped" are kept on the device (localStorage), not in the encrypted store.
+
 **After each lecture**
 
 - Honed knows when your classes happen, so after one it asks: *What did you cover today?* (in the prototype, when you next open the app; see Open questions).
