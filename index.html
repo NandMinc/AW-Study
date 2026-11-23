@@ -8,7 +8,10 @@
     <meta name="apple-mobile-web-app-title" content="%APP_NAME%" />
     <meta name="theme-color" content="#272727" />
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />  </head>
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- The bug button (#141): off unless this browser opened Honed with ?bugs=on or turned it on in Settings.
+         The same file as Nathan's admin site's bugreport.js; reports go to his Bug reports page. -->
+    <script src="/bugreport.js" data-app="honed" data-endpoint="https://bugs.pacificfish.ca/api/bugs"></script>  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

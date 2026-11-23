@@ -128,6 +128,20 @@ fall, and when sections are due, but not a word of the slides, the class names, 
 the scores. (A field may move from "readable" to "encrypted" if no
 index needs it; it must not move the other way without changing this table first.)
 
+## Bug reports (#141, agreed by Matt Nov 23)
+
+The one other way data can leave the device, and only when the person does it on purpose: the **bug
+button** (`public/bugreport.js`, the same file as Nathan's admin site's). It's off unless a browser opened
+Honed with `?bugs=on` or turned it on in Settings. Pressing it draws a picture of the screen in the browser
+(no outside service), shows it with a note box, and only **Save** sends the picture, the note, the page's
+address, the device's screen size and browser, and the page's last errors to
+`https://bugs.pacificfish.ca/api/bugs` (so `connect-src` lists that address). That address is Nathan's
+admin server behind its own Cloudflare Access application (Google sign-in, Nathan and Matt only): it can
+only take new reports, each saved with the sender's email, and they're read only on Nathan's admin site.
+Anyone else's report is refused there. A browser not signed in yet keeps the report and offers
+"Sign in to send", which signs in at `bugs.pacificfish.ca/signin` and comes back.
+The picture can show whatever was on screen (slides, notes): that's the point, and why it's opt-in and per press.
+
 ## AI requests (#27, #34, #40)
 
 AI is the one time data leaves the device. Everything else in this document is about data at rest.
