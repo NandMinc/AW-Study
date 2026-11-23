@@ -14,7 +14,8 @@ export const HEADERS = {
     "style-src 'self'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    "connect-src 'self'",
+    // admin.pacificfish.ca: only the opt-in bug button (#141, public/bugreport.js) sends there
+    "connect-src 'self' https://admin.pacificfish.ca",
     "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'none'",

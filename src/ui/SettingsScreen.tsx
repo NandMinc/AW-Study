@@ -154,6 +154,8 @@ export function SettingsScreen({ onLock, onReplaced = () => {} }: { onLock: () =
 
       <ThisDevice onLock={onLock} />
 
+      <BugButtonSetting />
+
       <h3>Help</h3>
       <p>
         <a href={href({ name: 'tasks', tour: true })}>How {APP_NAME} works</a> <span className="muted small">(the short tour from the first run)</span>
@@ -332,6 +334,47 @@ function NewRecoveryKey({ changeKey, onDone }: { changeKey: CryptoKey; onDone: (
 }
 
 /** Phone (follows the phone's light or dark setting, the default), Light or Dark, for this device. */
+/**
+ * The bug button (#141, public/bugreport.js): off unless turned on here or by opening Honed with ?bugs=on. Here for
+ * Home Screen apps, which keep their own storage and can't be opened at an address. Reloads so the button appears.
+ */
+function BugButtonSetting() {
+  const read = () => {
+    try {
+      return localStorage.getItem('bugButton') === 'on';
+    } catch {
+      return false;
+    }
+  };
+  const [on] = useState(read);
+  const flip = () => {
+    try {
+      if (on) localStorage.removeItem('bugButton');
+      else localStorage.setItem('bugButton', 'on');
+    } catch {
+      return;
+    }
+    location.reload();
+  };
+  return (
+    <>
+      <h3>Bug button</h3>
+      <div className="setting-row">
+        <span>
+          {on ? 'On on this device.' : 'Off on this device.'}{' '}
+          <span className="muted small">
+            A round button that saves a picture of the screen and a note to Nathan’s bug reports. Only works when signed in
+            to admin.pacificfish.ca.
+          </span>
+        </span>
+        <button type="button" onClick={flip}>
+          {on ? 'Turn off the bug button' : 'Turn on the bug button'}
+        </button>
+      </div>
+    </>
+  );
+}
+
 function ThemeSetting() {
   const [theme, setTheme] = useState<Theme>(savedTheme);
   const choose = (next: Theme) => {

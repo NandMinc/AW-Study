@@ -42,7 +42,7 @@ describe('server', () => {
     const csp = res.headers.get('content-security-policy');
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval'");
-    expect(csp).toContain("connect-src 'self'");
+    expect(csp).toContain("connect-src 'self' https://admin.pacificfish.ca;"); // only the bug button's reports (#141) go elsewhere
     expect(csp).not.toContain('unsafe-inline');
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
   });
