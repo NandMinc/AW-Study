@@ -4,7 +4,7 @@
 // src/ui/PracticeScreen.tsx; the planner decides when a practice is due (src/plan/planner.ts).
 import type { SlideText, WrittenQuestion } from '../ai/backend';
 import type { Section } from '../types/lecture';
-import type { OptionIndex, Question, QuizAttempt, QuizAttemptInput, WrittenAnswer } from '../types/quiz';
+import { isChoice, type OptionIndex, type Question, type QuizAttempt, type QuizAttemptInput, type WrittenAnswer } from '../types/quiz';
 import { sectionSlides } from './bank';
 import { pickQuiz, type QuizItem, type Random } from './pick';
 
@@ -40,9 +40,12 @@ export function writtenPages(s: Pick<PracticeSection, 'section' | 'pageTexts'>):
   return Array.from({ length: WRITTEN_PAGES_MAX }, (_, i) => slides[Math.floor((i * slides.length) / WRITTEN_PAGES_MAX)]!);
 }
 
-/** Whether a section has anything to ask: questions in its bank, or text to write short answers from. */
+/** Multiple-choice questions in a section's bank (what a practice asks from it; short ones wait for #124). */
+export const choiceCount = (s: Pick<PracticeSection, 'bank'>) => s.bank.filter(isChoice).length;
+
+/** Whether a section has anything to ask: multiple choice in its bank, or text to write short answers from. */
 export function canAsk(s: PracticeSection): boolean {
-  return s.bank.length > 0 || writtenPages(s).length > 0;
+  return choiceCount(s) > 0 || writtenPages(s).length > 0;
 }
 
 /**

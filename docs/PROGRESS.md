@@ -61,7 +61,8 @@ slides" and "M6: AI helper and quizzes":
 | Phone slide page: just the slides | #110 | Nathan's Claude | `src/App.tsx`, `src/ui/SlidesScreen.tsx`, `src/viewer/SlideViewer.tsx`, `src/app.css`, `src/viewer/viewer.css`, tests | **Done** (this PR) |
 | CI: tests side by side, no second run on main, images built alongside | #112 | Nathan's Claude | `.github/workflows/publish.yml`, its line in `CLAUDE.md` | **Done** (this PR) |
 | AI questions stand on their own (no "this diagram"), with worked problems | #115 | Nathan's Claude | the question prompts and `refersToUnseen` in `helper/jobs.mjs`, `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (this PR). Live once `honed-ai` is updated; banks made before keep their old questions |
-| Design: exam style guide per class, question levels, short answers in quizzes | #117 | Nathan's Claude | `docs/DESIGN.md` ("Exam style and question levels", the Quizzes decision, two open questions) | **Design PR open**, waiting for Matt's OK; built in five later issues. Scores weighted by level; "File types to support" list (Nathan, Nov 22) |
+| Design: exam style guide per class, question levels, short answers in quizzes | #117 | Nathan's Claude | `docs/DESIGN.md` ("Exam style and question levels", the Quizzes decision, two open questions) | **Done** (PR #119, Matt's OK); built in #120-#124. Scores weighted by level; "File types to support" list (Nathan, Nov 22) |
+| Exam style 1: contract and storage | #120 | Nathan's Claude | new `src/types/style.ts`; `Level`, `ChoiceQuestion`/`ShortQuestion`, `ShortAnswer`, the weighted score in `src/types/quiz.ts`; `src/db/quiz.ts` (forms, levels, short answers, weighted score); `pickQuiz` multiple choice only for now; then the materials and guide storage in `src/db/` and sync | Contract and quiz storage **this PR**; materials and guide storage next |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -153,6 +154,10 @@ the "Test and publish" run on `main` to finish, then press Update.
   or saved without the unmarked ones, which don't count. Never a made-up mark. A browser test checks the typed
   answer goes only to `/ai/grade`. 16 deliberate breaks, all caught. **Milestone 9 is done.**
 
+- **Nov 22 (#120, part 1):** Exam style contract. `src/types/style.ts` (materials, notes, the guide, `ExamStyleStore`; storage next).
+  Questions have `form` (`choice` | `short`) and `level` 1-3; older ones read as choice, level 2 (`withDefaults`, `isChoice`). Attempts
+  record each answer's level and short answers to banked questions; `score` is weighted by level (exam practice's written answers
+  count as level 3; `right` stays a plain count). `pickQuiz` asks multiple choice only until #124.
 - **Nov 22 (#87, part 4):** The planner offers **exam practice** on the 2 days before an exam (`practiceFor`,
   `Plan.practice`, `RULES.examPracticeDays` and `examPractice`), until a practice for it is saved in those days.
   It covers up to 10 of the exam's sections, the weakest, in lecture order, with 2 multiple-choice and 1

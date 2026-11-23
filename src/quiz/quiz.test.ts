@@ -120,6 +120,8 @@ describe('pickQuiz', () => {
     deckId: 'd',
     page: 1,
     question: id,
+    form: 'choice',
+    level: 2,
     options: ['a', 'b', 'c', 'd'],
     answer: 0,
     explanation: '',
@@ -138,6 +140,13 @@ describe('pickQuiz', () => {
     createdAt: finishedAt,
   });
   const noShuffle = () => 0.999; // leaves arrays in order
+
+  it('asks only multiple choice for now (#120: short answers reach the quiz with #124); one with no form counts', () => {
+    const shortOne = { ...question('s'), form: 'short', level: 3, points: ['p'] } as unknown as Question;
+    const { form: _form, ...noForm } = question('old');
+    const picked = pickQuiz([question('a'), shortOne, noForm as Question], [], 10, noShuffle);
+    expect(picked.map((p) => p.question.id)).toEqual(['a', 'old']);
+  });
 
   it('asks last time’s wrong answers first, then new questions, then the longest-ago', () => {
     const bank = ['a', 'b', 'c', 'd', 'e', 'f'].map(question);

@@ -11,6 +11,7 @@ import { describeScore } from '../quiz/pick';
 import {
   attemptInputs,
   canAsk,
+  choiceCount,
   gradeSlides,
   isBlank,
   practiceQuestions,
@@ -115,7 +116,7 @@ function Start({ loaded, onStart }: { loaded: Loaded; onStart: (questions: Pract
   useEffect(() => () => abort.current?.abort(), []);
 
   const toWrite = sections.filter((s) => writtenPages(s).length > 0);
-  const choices = sections.reduce((n, s) => n + Math.min(item.mcPerSection, s.bank.length), 0);
+  const choices = sections.reduce((n, s) => n + Math.min(item.mcPerSection, choiceCount(s)), 0);
   const shorts = toWrite.length * item.writtenPerSection;
 
   const start = async () => {

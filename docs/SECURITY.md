@@ -107,8 +107,8 @@ sessions and settings:
 | deckPages | id (the deck's) | the text of every page |
 | lectures | id, courseId, date | minutes, dates |
 | sections | id, courseId, lectureId, deckId, nextDue | page range, the rest of the schedule (budget, minutes studied, extra minutes), dates |
-| questions (#40) | id, courseId, sectionId | the slide number, question, options, answer, explanation, dates |
-| quizAttempts (#40) | id, courseId, sectionId | when, every answer, the score; for exam practice (#87) the exam and every short answer (the question, its points, what you typed, the mark and feedback) |
+| questions (#40) | id, courseId, sectionId | the slide number, question, its form and level (#120), options and answer or a short answer's points, explanation, dates |
+| quizAttempts (#40) | id, courseId, sectionId | when, every answer, the score; each answer's level and short answers to banked questions (what you typed, the mark and feedback; #120); for exam practice (#87) the exam and every short answer (the question, its points, what you typed, the mark and feedback) |
 | studySessions (#47) | id, courseId, sectionId | which session (first week or extra), when, minutes spent |
 | settings (#47) | id (`study`) | the daily study minutes, the Tasks page's class order (#72) |
 | annotations (#56) | id, courseId, deckId | the page, the kind, where it is on the page, the words highlighted, the colour, the note, dates |

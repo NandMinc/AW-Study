@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WrittenQuestion } from '../ai/backend';
 import type { Section } from '../types/lecture';
-import type { Question } from '../types/quiz';
+import type { ChoiceQuestion, ShortQuestion } from '../types/quiz';
 import { attemptInputs, canAsk, gradeSlides, isBlank, practiceQuestions, writtenPages, WRITTEN_PAGES_MAX, type PracticeAnswer, type PracticeSection } from './practice';
 
 const T = { startedAt: '2026-12-08T18:00:00.000Z', finishedAt: '2026-12-08T18:20:00.000Z' };
@@ -20,14 +20,17 @@ function section(id: string, firstPage: number, lastPage: number): Section {
     updatedAt: T.startedAt,
   };
 }
-function question(id: string, sectionId: string, page: number): Question {
-  return { id, courseId: 'c', sectionId, deckId: 'd', page, question: `Q ${id}?`, options: ['a', 'b', 'c', 'd'], answer: 0, explanation: '', createdAt: T.startedAt };
+function question(id: string, sectionId: string, page: number): ChoiceQuestion {
+  return { id, courseId: 'c', sectionId, deckId: 'd', page, question: `Q ${id}?`, form: 'choice', level: 2, options: ['a', 'b', 'c', 'd'], answer: 0, explanation: '', createdAt: T.startedAt };
+}
+function short(id: string, sectionId: string, page: number): ShortQuestion {
+  return { id, courseId: 'c', sectionId, deckId: 'd', page, question: `S ${id}?`, form: 'short', level: 3, points: ['p'], explanation: '', createdAt: T.startedAt };
 }
 const texts = (n: number) => Array.from({ length: n }, (_, i) => `Slide ${i + 1} text`);
 const wq = (page: number, points = ['one', 'two']): WrittenQuestion => ({ question: `Explain slide ${page}.`, points, page });
 const fixed = () => 0.5;
 
-function practiceSection(id: string, first: number, last: number, bank: Question[] = [], pageTexts = texts(40)): PracticeSection {
+function practiceSection(id: string, first: number, last: number, bank: (ChoiceQuestion | ShortQuestion)[] = [], pageTexts = texts(40)): PracticeSection {
   return { section: section(id, first, last), pageTexts, bank, attempts: [] };
 }
 
@@ -55,6 +58,10 @@ describe('what a practice asks', () => {
     expect(canAsk(fresh)).toBe(true);
     expect(canAsk(practiceSection('p', 1, 3, [], ['', ' ', '']))).toBe(false); // pictures only, no bank
     expect(canAsk(practiceSection('p', 1, 3, [question('q', 'p', 1)], ['', '', '']))).toBe(true);
+    // A banked short question (#120) isn't asked here: practice writes its own
+    const shortOnly = practiceSection('p', 1, 3, [short('s', 'p', 1)], ['', '', '']);
+    expect(canAsk(shortOnly)).toBe(false);
+    expect(practiceQuestions([practiceSection('a', 1, 5, [short('s', 'a', 1)])], new Map(), 2, fixed)).toEqual([]);
   });
 
   it('short answers are written from the section’s slides with text, at most 60, spread evenly', () => {
