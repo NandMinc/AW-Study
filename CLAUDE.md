@@ -92,8 +92,8 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
 - `src/types/annotation.ts` and `src/db/annotations.ts` (#56): notes and highlights, per deck page.
 - `src/ai/`: the app's side of AI. `AiBackend` (every AI job goes through it, and `status()`, the
   helper's `/ai/whoami` for Settings' sign-in check), `HttpAiBackend`
-  (our helper at `/ai/`), `FakeAiBackend` (tests and development), and `check.ts` (replies are
-  checked on the device before use).
+  (our helper at `/ai/`), `FakeAiBackend` (tests and development), `check.ts` (replies are
+  checked on the device before use) and `style.ts` (what the exam style job is sent, cut to fit; #121).
 - `src/ui/`: the screens (React). `route.ts` (hash routes, no router library), `store-context.ts`
   (the store reaches screens through React context). Three main pages behind `NavBar` (#68): `TasksScreen`
   (`#/`, the home page: today's checklist), `ClassesScreen` (`#/classes`: a heading and `ClassMenu` per class, a date button per lecture to fill in,

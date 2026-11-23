@@ -2,7 +2,7 @@
 // every failure turned into an error the screens can explain. A fake fetch: nothing is sent.
 import { describe, expect, it } from 'vitest';
 import { AiError, type McQuestion } from './backend';
-import { checkQuestions } from './check';
+import { checkGradeMany, checkQuestions, checkStyle } from './check';
 import { FakeAiBackend } from './fake';
 import { HttpAiBackend, signInUrl } from './http';
 
@@ -11,6 +11,8 @@ const SLIDES = [
   { page: 22, text: 'Ionic bonds: one atom gives an electron to another.' },
 ];
 const good = (page = 21, question = 'What do atoms share in a covalent bond?'): McQuestion => ({
+  form: 'choice',
+  level: 2,
   question,
   options: ['A pair of electrons', 'Protons', 'Neutrons', 'Nothing'],
   answer: 0,
@@ -210,5 +212,105 @@ describe('FakeAiBackend', () => {
     expect(fake.calls.map((c) => c.job)).toEqual(['makeQuestions', 'gradeAnswer']);
     fake.failWith = 'limit';
     expect(await codeOf(fake.explain({ selection: 'x', slides: SLIDES }))).toBe('limit');
+  });
+});
+
+describe('exam style (#121)', () => {
+  const pages = [21, 22];
+  const short = (over: Record<string, unknown> = {}) => ({ form: 'short', level: 3, question: 'Why do atoms bond?', points: ['to be stable'], page: 22, explanation: 'To be stable.', ...over });
+  const mix = { choice: [1, 1, 0] as [number, number, number], short: 1 };
+  const GUIDE = { tests: 'Bonding, mostly explained.', levels: ['Name it.', 'Apply it.', 'Explain it.'] as [string, string, string], shortShare: 0.5 };
+
+  it('questions keep their level (none: 2); short ones only as many as the mix asked for, level 3, 1 to 3 points', () => {
+    const reply = {
+      questions: [
+        { ...good(21, 'Level one?'), level: 1 },
+        { ...good(21, 'No level?'), level: undefined },
+        { ...good(21, 'Level four?'), level: 4 },
+        short({ level: 2 }),
+        short({ question: 'Four points?', points: ['a', 'b', 'c', 'd'] }),
+        short({ question: 'An empty point?', points: [' '] }),
+        short({ question: 'A second short one?' }),
+      ],
+    };
+    const made = checkQuestions(reply, pages, 10, mix);
+    expect(made.map((q) => [q.question, q.form, q.level])).toEqual([
+      ['Level one?', 'choice', 1],
+      ['No level?', 'choice', 2],
+      ['Why do atoms bond?', 'short', 3], // level 3 whatever the reply said
+    ]);
+    expect(made[2]).toEqual({ form: 'short', level: 3, question: 'Why do atoms bond?', points: ['to be stable'], page: 22, explanation: 'To be stable.' });
+    expect(checkQuestions({ questions: [short(), good()] }, pages, 10).map((q) => q.form)).toEqual(['choice']); // no mix: no short ones
+  });
+
+  it('makeQuestions sends the guide and the mix, and checks the reply against the mix', async () => {
+    const { seen, fetcher } = fakeFetch(() => json(200, { questions: [short(), short({ question: 'Extra?' }), good()] }));
+    const made = await new HttpAiBackend('/ai/', fetcher).makeQuestions({ pages: SLIDES, count: 2, guide: GUIDE, mix: { choice: [1, 0, 0], short: 1 } });
+    expect(made.map((q) => q.form)).toEqual(['short', 'choice']);
+    expect(JSON.parse(seen[0]!.init.body as string)).toMatchObject({ guide: GUIDE, mix: { choice: [1, 0, 0], short: 1 } });
+  });
+
+  const items = [
+    { question: 'What is a covalent bond?', points: ['share', 'pair'], answer: 'They share.', page: 21 },
+    { question: 'What is an ionic bond?', points: ['transfer'], answer: '', page: 22 },
+  ];
+
+  it('gradeMany posts to /ai/grade-many and gives one grade per answer, out of its points', async () => {
+    const { seen, fetcher } = fakeFetch(() => json(200, { marks: [{ mark: 1, feedback: 'Half.' }, { mark: 0, feedback: 'Blank.' }] }));
+    expect(await new HttpAiBackend('/ai/', fetcher).gradeMany({ slides: SLIDES, items })).toEqual([
+      { mark: 1, outOf: 2, feedback: 'Half.' },
+      { mark: 0, outOf: 1, feedback: 'Blank.' },
+    ]);
+    expect(seen.map((s) => s.url)).toEqual(['/ai/grade-many']);
+    expect(JSON.parse(seen[0]!.init.body as string)).toEqual({ slides: SLIDES, items });
+  });
+
+  it('gradeMany is all or nothing: one mark too many, too few, out of range or without feedback, and none are used', () => {
+    const ok = { mark: 1, feedback: 'x' };
+    expect(checkGradeMany({ marks: [ok, { mark: 1, feedback: 'y' }] }, [2, 1])).toHaveLength(2);
+    for (const marks of [[ok], [ok, ok, ok], [ok, { mark: 2, feedback: 'x' }], [ok, { mark: 0.5, feedback: 'x' }], [ok, { mark: 0, feedback: ' ' }]]) {
+      expect(() => checkGradeMany({ marks }, [2, 1]), JSON.stringify(marks)).toThrow(AiError);
+    }
+    expect(() => checkGradeMany({}, [1])).toThrow(AiError);
+  });
+
+  const request = { className: 'CHEM 101', notes: 'No proofs.', materials: [{ kind: 'past-exam' as const, title: 'Midterm', text: 'Q1' }], lectures: [], previous: null };
+
+  it('makeStyleGuide posts to /ai/style and checks the guide', async () => {
+    const { seen, fetcher } = fakeFetch(() => json(200, { tests: ' Bonding. ', levels: ['a', 'b', 'c'], shortShare: 0.25 }));
+    expect(await new HttpAiBackend('/ai/', fetcher).makeStyleGuide(request)).toEqual({ tests: 'Bonding.', levels: ['a', 'b', 'c'], shortShare: 0.25 });
+    expect(seen.map((s) => s.url)).toEqual(['/ai/style']);
+    expect(JSON.parse(seen[0]!.init.body as string)).toEqual(request);
+  });
+
+  it('a guide without its description, three levels, or a share from 0 to 1 is unusable', () => {
+    const guide = { tests: 'T', levels: ['a', 'b', 'c'], shortShare: 0.5 };
+    expect(checkStyle(guide)).toEqual(guide);
+    for (const bad of [
+      { ...guide, tests: ' ' },
+      { ...guide, levels: ['a', 'b'] },
+      { ...guide, levels: ['a', '', 'c'] },
+      { ...guide, shortShare: -0.1 },
+      { ...guide, shortShare: 1.1 },
+      { ...guide, shortShare: '0.5' },
+      { ...guide, shortShare: Number.NaN },
+    ]) {
+      expect(() => checkStyle(bad), JSON.stringify(bad)).toThrow(AiError);
+    }
+  });
+
+  it('the fake follows the mix, passes the real checks, marks many, and writes a guide', async () => {
+    const fake = new FakeAiBackend();
+    const made = await fake.makeQuestions({ pages: SLIDES, count: 4, mix: { choice: [1, 1, 1], short: 1 } });
+    expect(made.map((q) => [q.form, q.level])).toEqual([
+      ['choice', 1],
+      ['choice', 2],
+      ['choice', 3],
+      ['short', 3],
+    ]);
+    expect(checkQuestions({ questions: made }, pages, 4, { choice: [1, 1, 1], short: 1 })).toHaveLength(4);
+    expect((await fake.gradeMany({ slides: SLIDES, items })).map((g) => g.mark)).toEqual([1, 0]);
+    expect(checkStyle(await fake.makeStyleGuide(request))).toBeTruthy();
+    expect(fake.calls.map((c) => c.job)).toEqual(['makeQuestions', 'gradeMany', 'makeStyleGuide']);
   });
 });

@@ -1,5 +1,6 @@
 // The helper's HTTP API (served at /ai/ behind Cloudflare Access):
-//   POST /ai/questions, /ai/grade, /ai/explain, /ai/ask: JSON in, JSON out (helper/jobs.mjs)
+//   POST /ai/questions, /ai/written, /ai/grade, /ai/grade-many, /ai/style, /ai/explain, /ai/ask: JSON in,
+//        JSON out (helper/jobs.mjs)
 //   GET  /ai/signin?then=<path>: where "Sign in for AI" goes; a page linking back into the app
 //   GET  /ai/whoami: for setting up (JSON: who you are, whether you're ready, today's count)
 //   GET  /healthz: for the container's health check (no sign-in, says nothing)
