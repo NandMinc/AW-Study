@@ -21,6 +21,12 @@ export const RULES = {
    * so it's quizzed at least `examQuizzes` times before the day, even past the daily minutes. */
   examPullDays: 10,
   examQuizzes: 2,
+  /** Exam practice (#87): offered on this many days before an exam (2: two days and one day before), once.
+   * It asks about up to `maxSections` of the sections the exam covers (the weakest), each with
+   * `mcPerSection` multiple-choice and `writtenPerSection` short-answer questions; a short answer counts
+   * as `minutesPerWritten` minutes. */
+  examPracticeDays: 2,
+  examPractice: { maxSections: 10, mcPerSection: 2, writtenPerSection: 1, minutesPerWritten: 3 },
   /** Below this, a section counts as weak: it comes first, and gets extra study. */
   weakScore: 0.7,
   /** DESIGN's score table, highest band first: what a quiz's score sets for the next one. (The 90% band's
