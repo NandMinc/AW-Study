@@ -151,9 +151,11 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
-- **Nov 23 (#141, draft, needs Matt's OK):** The bug button from Nathan's other apps: off unless `?bugs=on` or Settings'
-  switch; a picture of the screen and a note, sent to his admin site's Bug reports. Changes two rules for this button only:
-  `connect-src` gains `https://admin.pacificfish.ca`, and SECURITY.md gets a "Bug reports" exception. Not merged until Matt agrees.
+- **Nov 23 (#141, agreed by Matt):** The bug button from Nathan's other apps: off unless `?bugs=on` or Settings'
+  switch; a picture of the screen and a note, sent to `https://bugs.pacificfish.ca/api/bugs` (Nathan's admin server behind
+  its own Access application: Matt and Nathan can send, only Nathan's admin site reads them, each with who sent it). The
+  first send from a browser offers "Sign in to send". Changes two rules for this button only: `connect-src` gains
+  `https://bugs.pacificfish.ca`, and SECURITY.md gets a "Bug reports" exception.
 - **Nov 22 (#124):** Short answers in quizzes. Banks get them (the guide's share of level 3); a quiz whose bank has them first
   checks the helper's whoami (no AI used, 5 s at most) and otherwise goes multiple choice only with a note saying why; typed
   answers (no instant feedback) are marked in one `grade-many` request at the end, a blank one 0 and never sent; the results show
