@@ -16,14 +16,14 @@ let counter = 0;
 let name: string;
 let store: StudyStore;
 
-const q = (n: number, page = 21, extra: Partial<QuestionInput> = {}): QuestionInput => ({
+const q = (n: number, page = 21, extra: Record<string, unknown> = {}): QuestionInput => ({
   page,
   question: `What does slide ${page} say about bond ${n}?`,
   options: [`Right ${n}`, `Wrong A ${n}`, `Wrong B ${n}`, `Wrong C ${n}`],
   answer: 0,
   explanation: `Slide ${page} says so.`,
   ...extra,
-});
+} as QuestionInput);
 
 /** A class with one lecture of two sections: slides 21-30 and 31-35 of one deck. */
 async function setting() {
@@ -224,7 +224,9 @@ describe.each(['before setup (plain)', 'encrypted'] as const)('quiz store, %s', 
       });
       // 1 + 2/3 + 1 = 2.666… → 2.67, of 4
       expect(attempt).toMatchObject({ examId: midterm.id, right: 2.67, asked: 4 });
-      expect(attempt.score).toBeCloseTo(2.67 / 4);
+      // Weighted by level (#120): the multiple choice is level 2 (old-style input), written answers level 3:
+      // (2×1 + 2×0 + 3×2/3 + 3×1) ÷ (2 + 2 + 3 + 3) = 7 ÷ 10
+      expect(attempt.score).toBeCloseTo(0.7);
       expect(attempt.written).toEqual([w(), w({ question: 'Name the bond on slide 23.', page: 23, points: ['Covalent'], mark: 1 })]);
       expect(await store.listQuizAttempts(a.id)).toEqual([attempt]);
     });
@@ -271,6 +273,109 @@ describe.each(['before setup (plain)', 'encrypted'] as const)('quiz store, %s', 
       ];
       for (const [label, input] of cases) await expect(store.recordQuizAttempt(input), label).rejects.toMatchObject({ code: 'invalid' });
       expect(await store.listQuizAttempts()).toEqual([]);
+    });
+  });
+
+  describe('levels, forms and weighted scores (#120)', () => {
+    const short = (n: number, extra: Record<string, unknown> = {}) =>
+      ({ form: 'short', page: 22, question: `Why does bond ${n} form?`, points: ['atoms share electrons', 'to fill a shell'], ...extra }) as QuestionInput;
+
+    it('stores each question’s form and level: multiple choice at level 2 unless given, short answers at 3', async () => {
+      const { a } = await setting();
+      const made = await store.addQuestions(a.id, [q(1), q(2, 21, { level: 1 }), q(3, 21, { form: 'choice', level: 3 }), short(4)]);
+      expect(made.map((m) => [m.form, m.level])).toEqual([['choice', 2], ['choice', 1], ['choice', 3], ['short', 3]]);
+      expect(made[3]).toMatchObject({ form: 'short', level: 3, points: ['atoms share electrons', 'to fill a shell'], explanation: '' });
+      expect(made[3]).not.toHaveProperty('options');
+      expect(await store.listQuestions(a.id)).toEqual(made);
+    });
+
+    for (const [name, bad] of [
+      ['a short answer below level 3', short(1, { level: 2 })],
+      ['a short answer with no points', short(1, { points: [] })],
+      ['a short answer with 4 points', short(1, { points: ['a', 'b', 'c', 'd'] })],
+      ['a level of 4', q(1, 21, { level: 4 })],
+      ['another form', q(1, 21, { form: 'essay' })],
+    ] as const) {
+      it(`refuses ${name}`, async () => {
+        const { a } = await setting();
+        await expect(store.addQuestions(a.id, [bad])).rejects.toMatchObject({ code: 'invalid' });
+        expect(await store.listQuestions(a.id)).toEqual([]);
+      });
+    }
+
+    it('reads a question saved before #120 (no form, no level) as multiple choice at level 2', async () => {
+      if (mode === 'encrypted') return; // the raw row is only writable as plain text
+      const { a, course, deck } = await setting();
+      const db = await openHonedDb(name);
+      const old = { id: 'old-1', courseId: course.id, sectionId: a.id, deckId: deck.id, page: 21, question: 'Old?', options: ['a', 'b', 'c', 'd'], answer: 0, explanation: '', createdAt: T1 };
+      await db.put('questions', old as never);
+      db.close();
+      expect(await store.listQuestions(a.id)).toEqual([{ ...old, form: 'choice', level: 2 }]);
+      // and an answer to it counts as level 2
+      const attempt = await store.recordQuizAttempt({ sectionId: a.id, startedAt: T1, finishedAt: T2, answers: [{ questionId: 'old-1', chosen: 0, ms: 1 }] });
+      expect(attempt.answers[0]).toMatchObject({ right: true, level: 2 });
+    });
+
+    it('weights the score by level, and keeps `right` as a plain count', async () => {
+      const { a } = await setting();
+      const [easy, hard] = await store.addQuestions(a.id, [q(1, 21, { level: 1 }), q(2, 21, { level: 3 })]);
+      const attempt = await store.recordQuizAttempt({
+        sectionId: a.id,
+        startedAt: T1,
+        finishedAt: T2,
+        answers: [
+          { questionId: easy!.id, chosen: 0, ms: 1 }, // right
+          { questionId: hard!.id, chosen: 2, ms: 1 }, // wrong
+        ],
+      });
+      expect(attempt.answers.map((x) => x.level)).toEqual([1, 3]);
+      expect(attempt).toMatchObject({ right: 1, asked: 2 });
+      expect(attempt.score).toBeCloseTo(1 / 4); // not 1/2
+    });
+
+    it('records short answers with their marks, out of their points, and counts them at level 3', async () => {
+      const { a } = await setting();
+      const [mc, sa] = await store.addQuestions(a.id, [q(1), short(2)]);
+      const attempt = await store.recordQuizAttempt({
+        sectionId: a.id,
+        startedAt: T1,
+        finishedAt: T2,
+        answers: [{ questionId: mc!.id, chosen: 0, ms: 5 }],
+        short: [{ questionId: sa!.id, typed: '  They share electrons.  ', mark: 1, feedback: 'Say why.', ms: 9 }],
+      });
+      expect(attempt.short).toEqual([{ questionId: sa!.id, typed: 'They share electrons.', mark: 1, outOf: 2, feedback: 'Say why.', ms: 9, level: 3 }]);
+      expect(attempt).toMatchObject({ right: 1.5, asked: 2 });
+      expect(attempt.score).toBeCloseTo((2 * 1 + 3 * 0.5) / 5);
+      expect(await store.listQuizAttempts(a.id)).toEqual([attempt]);
+    });
+
+    it('a quiz of only short answers is fine; an ordinary quiz has no `short`', async () => {
+      const { a } = await setting();
+      const [mc, sa] = await store.addQuestions(a.id, [q(1), short(2)]);
+      const only = await store.recordQuizAttempt({ sectionId: a.id, startedAt: T1, finishedAt: T2, answers: [], short: [{ questionId: sa!.id, typed: '', mark: 0, feedback: '', ms: 1 }] });
+      expect(only).toMatchObject({ right: 0, asked: 1, score: 0 });
+      const plain = await store.recordQuizAttempt({ sectionId: a.id, startedAt: T1, finishedAt: T2, answers: [{ questionId: mc!.id, chosen: 0, ms: 1 }] });
+      expect(plain).not.toHaveProperty('short');
+    });
+
+    it('refuses short answers that don’t fit their question', async () => {
+      const { a, b } = await setting();
+      const [mc, sa] = await store.addQuestions(a.id, [q(1), short(2)]);
+      const [elsewhere] = await store.addQuestions(b.id, [short(3, { page: 32 })]);
+      const base = { sectionId: a.id, startedAt: T1, finishedAt: T2 };
+      const one = (extra: Record<string, unknown>) => ({ questionId: sa!.id, typed: 'x', mark: 1, feedback: '', ms: 1, ...extra });
+      for (const input of [
+        { ...base, answers: [], short: [one({ questionId: mc!.id })] }, // a multiple-choice question
+        { ...base, answers: [], short: [one({ questionId: elsewhere!.id })] }, // another section's
+        { ...base, answers: [], short: [one({ mark: 3 })] }, // more than its 2 points
+        { ...base, answers: [], short: [one({ mark: 0.5 })] }, // not a whole number
+        { ...base, answers: [], short: [one({}), one({})] }, // answered twice
+        { ...base, answers: [], short: [one({ typed: 'x'.repeat(1_001) })] }, // too long
+        { ...base, answers: [{ questionId: sa!.id, chosen: 0, ms: 1 }] }, // a short question answered as multiple choice
+      ]) {
+        await expect(store.recordQuizAttempt(input as never)).rejects.toMatchObject({ code: 'invalid' });
+      }
+      expect(await store.listQuizAttempts(a.id)).toEqual([]);
     });
   });
 
