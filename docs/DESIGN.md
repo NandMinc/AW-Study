@@ -147,7 +147,14 @@ A session is the slides for most of its time, then a quiz; the quiz is what move
 **Tests and exam practice**
 
 - A mixed test across the lectures an exam covers: multiple choice plus **short-answer questions graded by AI** against the slides, with a mark and one line of feedback each.
-- Its results feed each section's schedule like any quiz.
+- Its results feed each section's schedule like any quiz: it's saved as **one quiz attempt per section**, marked
+  with the exam (#87). A short answer counts as one question worth its mark ÷ its points (2 of 3 points is
+  0.67 of a question), so the score stays right ÷ asked, now to two places.
+- The short-answer questions are written by AI when the practice starts and kept only in the attempt, not
+  in the question bank. The multiple choice is marked on the device as always; a short answer's mark is the
+  AI's grade, which the device checks (a whole number, 0 to its points) but never makes up. If grading
+  fails, the multiple-choice part is still saved and the screen says the short answers weren't marked.
+- A practice counts as that section's quiz for the day, so it ticks off the section's item on Tasks.
 
 **Keeping it honest:** the score comes from your answers, never from how long you looked at the slides, so the schedule reflects what you actually know.
 
