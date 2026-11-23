@@ -5,7 +5,7 @@
 // doesn't reshuffle while you work, and what you finish stays on it, ticked, instead of disappearing.
 // A lecture is done when its quiz is done (Nathan, Nov 19): slide time alone never ticks anything.
 import { studyDay } from '../lib/studyDay';
-import { daysBetween, planDay, quizMinutes, type PlanInput, type PlanItem } from './planner';
+import { daysBetween, planDay, quizMinutes, type PlanInput, type PlanItem, type PracticeItem } from './planner';
 import type { Exam } from '../types/lecture';
 import { RULES } from './rules';
 
@@ -31,6 +31,9 @@ export interface TasksDay {
   overBudget: boolean;
   /** Exams whose sections took today past the daily minutes (#86): the page says so. */
   examsOver: Exam[];
+  /** Today's exam practice (#87), from the plan at the start of the day like the rest; done once a practice
+   * for that exam is saved today. Not in the progress bar. */
+  practice: { item: PracticeItem; done: boolean }[];
 }
 
 export interface TasksInput extends PlanInput {
@@ -78,7 +81,11 @@ export function tasksForDay(input: TasksInput): TasksDay {
     const items = byCourse.get(id)!;
     return { courseId: id, items, status: statusOf(items, input.nextExam[id] ?? null, input.today) };
   });
-  return { classes, progress: progress(classes.flatMap((c) => c.items)), overBudget: plan.overBudget, examsOver: plan.examsOver };
+  const practice = plan.practice.map((item) => ({
+    item,
+    done: input.attempts.some((a) => a.examId === item.examId && day(a.finishedAt) === input.today),
+  }));
+  return { classes, progress: progress(classes.flatMap((c) => c.items)), overBudget: plan.overBudget, examsOver: plan.examsOver, practice };
 }
 
 /** Done when every item is; otherwise an exam within RULES.examSoonDays, then anything new, then review. */

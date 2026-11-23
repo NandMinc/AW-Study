@@ -1,7 +1,8 @@
 // The Tasks page (#/, the home page; docs/design/README.md "Tasks", #77): today's work by class, in
 // the order the user drags them into, from src/plan/tasks.ts. A progress bar, Start (Play, in this
 // order), and a row per class that opens to its lectures, each with its slides and its quiz. No times
-// are shown (the daily minutes are in Settings). Nothing today: the penguin.
+// are shown (the daily minutes are in Settings). Nothing today: the penguin. Exam practice (#87) is a
+// row of its own above the classes, on the 2 days before an exam.
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { APP_NAME } from '../brand';
 import { daysBetween } from '../plan/planner';
@@ -96,6 +97,21 @@ export function TasksScreen() {
     });
 
   const left = classes.some((c) => c.status !== 'done');
+  const practice = data.practice.length > 0 && (
+    <ul className="task-practice" aria-label="Exam practice">
+      {data.practice.map((p) => {
+        const days = daysBetween(data.today, p.exam.date);
+        return (
+          <li key={p.exam.id} className="task-lecture" data-testid="task-practice">
+            <a href={href({ name: 'practice', examId: p.exam.id })}>
+              Practice for {p.course.name}’s {p.exam.title} ({days === 1 ? 'tomorrow' : `in ${days} days`})
+            </a>
+            {p.done && <Tick label="Practice done" />}
+          </li>
+        );
+      })}
+    </ul>
+  );
   return (
     <section className="tasks" aria-labelledby="tasks-title">
       <h2 id="tasks-title" className="page-title">
@@ -103,6 +119,7 @@ export function TasksScreen() {
       </h2>
       {classes.length === 0 ? (
         <div className="tasks-empty">
+          {practice}
           <Penguin />
           {data.hasLectures ? (
             <p data-testid="tasks-clear">Nothing to study today. Enjoy it!</p>
@@ -136,6 +153,7 @@ export function TasksScreen() {
               {problem}
             </p>
           )}
+          {practice}
           <ol className="task-classes" aria-label="Today’s classes">
             {classes.map((c) => {
               const name = place(c.items[0]!.item.sectionId)!.course.name;

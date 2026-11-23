@@ -2,7 +2,8 @@
 // #/class/<id>/<part>, the class's page opened at one part, from its menu on the Classes page, or
 // #/class/<id>/cover/<date>, "What was covered?" for that lecture), #/class/<id>/slides/<deckId>
 // (a deck in the viewer, optionally .../<first>-<last> for a section), #/class/<id>/quiz/<sectionId>,
-// #/play (today's checklist, one item after another), #/settings.
+// #/play (today's checklist, one item after another), #/practice/<examId> (today's exam practice, #87),
+// #/settings.
 // The hash keeps everything on one page (the service worker serves it offline) while the back
 // button and reloads still work. No router library.
 import { useEffect, useState } from 'react';
@@ -18,6 +19,7 @@ export type Route =
   | { name: 'slides'; courseId: string; deckId: string; first?: number; last?: number }
   | { name: 'quiz'; courseId: string; sectionId: string; compare?: boolean }
   | { name: 'play' }
+  | { name: 'practice'; examId: string }
   | { name: 'settings' }
   | { name: 'not-found' };
 
@@ -38,6 +40,7 @@ const PATTERNS: [RegExp, (m: RegExpMatchArray) => Route | null][] = [
   [new RegExp(`^#/class/${ID}/quiz/${ID}$`), (m) => ({ name: 'quiz', courseId: m[1]!, sectionId: m[2]! })],
   [new RegExp(`^#/class/${ID}/quiz/${ID}/compare$`), (m) => ({ name: 'quiz', courseId: m[1]!, sectionId: m[2]!, compare: true })],
   [/^#\/play$/, () => ({ name: 'play' })],
+  [new RegExp(`^#/practice/${ID}$`), (m) => ({ name: 'practice', examId: m[1]! })],
   [/^#\/settings$/, () => ({ name: 'settings' })],
 ];
 
@@ -73,6 +76,8 @@ export function href(route: Exclude<Route, { name: 'not-found' }>): string {
       return `#/class/${route.courseId}/quiz/${route.sectionId}${route.compare ? '/compare' : ''}`;
     case 'play':
       return '#/play';
+    case 'practice':
+      return `#/practice/${route.examId}`;
     case 'settings':
       return '#/settings';
   }

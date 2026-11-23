@@ -160,6 +160,14 @@ A session is the slides for most of its time, then a quiz; the quiz is what move
   AI's grade, which the device checks (a whole number, 0 to its points) but never makes up. If grading
   fails, the multiple-choice part is still saved and the screen says the short answers weren't marked.
 - A practice counts as that section's quiz for the day, so it ticks off the section's item on Tasks.
+- **The screen** (#87): a row on Tasks ("Practice for BIO 110's Final (in 2 days)", a tick once done) opens
+  `#/practice/<examId>`: what it covers, then **Start**, which has the AI write the short-answer questions (one
+  request a section). The questions come one at a time with **no feedback until the end**, like the exam. At the
+  end the AI marks each short answer (a blank one gets 0 and isn't sent), then one attempt per section is saved,
+  and the results show each answer with its mark, the feedback and what a full answer says. If writing fails:
+  **Try again**, or **Practise without short answers** (the multiple choice alone). If marking fails: **Try
+  marking again**, or **Save without them** (the unmarked ones don't count, and the results say so). It can be
+  done again the same day; each one is saved.
 
 **Keeping it honest:** the score comes from your answers, never from how long you looked at the slides, so the schedule reflects what you actually know.
 
