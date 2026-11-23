@@ -68,6 +68,9 @@ function plan(today: string, parts: { lectures: Lecture[]; sections: Section[]; 
   };
   return planDay(input);
 }
+// Quiz minutes are by level since #123 (RULES.levels: 20 s, 45 s, 2 min a question, in the section's stage):
+// e.g. 5 questions learning 5 min, new or exam 6; 3 known or learning 4 (with the anchor), exam 5; 8 new 11;
+// 10 new 13; 15 new 21.
 const summary = (items: ReturnType<typeof planDay>['today']) =>
   items.map((i) => `${i.kind}${i.kind === 'study' ? i.step : ''}:${i.sectionId}:${i.minutes}${'quizSize' in i ? `/${i.quizSize}q` : ''}`);
 
@@ -148,7 +151,7 @@ describe('after the first week: quizzes by score', () => {
 
   it('the first quiz is 7 days after the first week, 5 questions', () => {
     expect(plan('2026-11-14', parts()).today).toEqual([]);
-    expect(summary(plan('2026-11-15', parts()).today)).toEqual([`quiz:${s.id}:4/5q`]);
+    expect(summary(plan('2026-11-15', parts()).today)).toEqual([`quiz:${s.id}:5/5q`]);
     expect(plan('2026-11-20', parts()).today[0]!.overdueDays).toBe(5); // missed days roll forward
   });
 
@@ -156,36 +159,36 @@ describe('after the first week: quizzes by score', () => {
     const big = { ...section(l), firstPage: 1, lastPage: 30 };
     expect(summary(plan('2026-11-02', { lectures: [l], sections: [big] }).today)).toEqual([`study1:${big.id}:17/15q`]);
     const done = [studied(big, '2026-11-02', 1), studied(big, '2026-11-04', 2), studied(big, '2026-11-08', 3)];
-    expect(summary(plan('2026-11-15', { lectures: [l], sections: [big], sessions: done }).today)).toEqual([`quiz:${big.id}:10/15q`]);
+    expect(summary(plan('2026-11-15', { lectures: [l], sections: [big], sessions: done }).today)).toEqual([`quiz:${big.id}:21/15q`]);
     const after = [quizzed(big, '2026-11-15', 1)]; // then the score table takes over
-    expect(summary(plan('2026-12-03', { lectures: [l], sections: [big], sessions: done, attempts: after }).today)).toEqual([`quiz:${big.id}:2/3q`]);
+    expect(summary(plan('2026-12-03', { lectures: [l], sections: [big], sessions: done, attempts: after }).today)).toEqual([`quiz:${big.id}:4/3q`]);
   });
 
   it('90% or more: 2.5x the gap, 3 questions; 70-89%: 1.5x, 5 questions', () => {
     const great = parts([quizzed(s, '2026-11-15', 1)]); // gap 7 → 18 days: Dec 3
     expect(plan('2026-12-02', great).today).toEqual([]);
-    expect(summary(plan('2026-12-03', great).today)).toEqual([`quiz:${s.id}:2/3q`]);
+    expect(summary(plan('2026-12-03', great).today)).toEqual([`quiz:${s.id}:4/3q`]);
     const good = parts([quizzed(s, '2026-11-15', 0.8), quizzed(s, '2026-11-26', 0.8)]); // 7 → 11 → 17: Dec 13
     expect(plan('2026-12-12', good).today).toEqual([]);
-    expect(summary(plan('2026-12-13', good).today)).toEqual([`quiz:${s.id}:4/5q`]);
+    expect(summary(plan('2026-12-13', good).today)).toEqual([`quiz:${s.id}:5/5q`]);
   });
 
   it('50-69%: again in 2 days, 8 questions, and 10 minutes of extra study first', () => {
     const p = parts([quizzed(s, '2026-11-15', 0.6)]);
     expect(summary(plan('2026-11-16', p).today)).toEqual([`extra:${s.id}:10`]);
-    expect(summary(plan('2026-11-17', p).today)).toEqual([`extra:${s.id}:10`, `quiz:${s.id}:6/8q`]);
+    expect(summary(plan('2026-11-17', p).today)).toEqual([`extra:${s.id}:10`, `quiz:${s.id}:11/8q`]);
     const studiedExtra = parts([quizzed(s, '2026-11-15', 0.6)], [studied(s, '2026-11-16', null, 10)]);
-    expect(summary(plan('2026-11-17', studiedExtra).today)).toEqual([`quiz:${s.id}:6/8q`]);
+    expect(summary(plan('2026-11-17', studiedExtra).today)).toEqual([`quiz:${s.id}:11/8q`]);
   });
 
   it('under 50%: tomorrow, 10 questions, 20 minutes extra, until the score recovers', () => {
     const p = parts([quizzed(s, '2026-11-15', 0.3)]);
-    expect(summary(plan('2026-11-16', p).today)).toEqual([`extra:${s.id}:20`, `quiz:${s.id}:7/10q`]);
+    expect(summary(plan('2026-11-16', p).today)).toEqual([`extra:${s.id}:20`, `quiz:${s.id}:13/10q`]);
     const again = parts([quizzed(s, '2026-11-15', 0.3), quizzed(s, '2026-11-16', 0.4)], [studied(s, '2026-11-16', null, 20, 10)]);
-    expect(summary(plan('2026-11-17', again).today)).toEqual([`extra:${s.id}:20`, `quiz:${s.id}:7/10q`]); // still weak: again
+    expect(summary(plan('2026-11-17', again).today)).toEqual([`extra:${s.id}:20`, `quiz:${s.id}:13/10q`]); // still weak: again
     const recovered = parts([quizzed(s, '2026-11-15', 0.3), quizzed(s, '2026-11-16', 0.9)], [studied(s, '2026-11-16', null, 20, 10)]);
     expect(plan('2026-11-17', recovered).today).toEqual([]); // 0.9 after a 1-day gap: at least 3 days
-    expect(summary(plan('2026-11-19', recovered).today)).toEqual([`quiz:${s.id}:2/3q`]);
+    expect(summary(plan('2026-11-19', recovered).today)).toEqual([`quiz:${s.id}:4/3q`]);
   });
 
   it('a low score in the first week asks for extra study the next day too', () => {
@@ -193,6 +196,33 @@ describe('after the first week: quizzes by score', () => {
     const s2 = section(l2);
     const p = { lectures: [l2], sections: [s2], sessions: [studied(s2, '2026-11-17', 1)], attempts: [quizzed(s2, '2026-11-17', 0.4)] };
     expect(summary(plan('2026-11-18', p).today)).toEqual([`extra:${s2.id}:20`]);
+  });
+});
+
+describe('each item’s stage: which levels its quiz asks (#123)', () => {
+  const l = lecture('2026-11-01');
+  const s = section(l);
+  const week = [studied(s, '2026-11-02', 1), studied(s, '2026-11-04', 2), studied(s, '2026-11-08', 3)];
+  const stageOn = (today: string, attempts: QuizAttempt[] = [], sessions = week) => {
+    const item = plan(today, { lectures: [l], sections: [s], sessions, attempts }).today.find((i) => i.kind !== 'extra');
+    return item && 'stage' in item ? item.stage : null;
+  };
+
+  it('first-week sessions are new; the first quiz after (no score yet) too', () => {
+    expect(stageOn('2026-11-02', [], [])).toBe('new');
+    expect(stageOn('2026-11-15')).toBe('new');
+  });
+
+  it('after quizzes: new under 70%, learning, known after two at 90% or more', () => {
+    expect(stageOn('2026-11-17', [quizzed(s, '2026-11-15', 0.5)])).toBe('new'); // 50-69%: again 2 days later
+    expect(stageOn('2026-12-03', [quizzed(s, '2026-11-15', 1)])).toBe('learning');
+    const twice = [quizzed(s, '2026-11-15', 1), quizzed(s, '2026-12-03', 0.9)]; // 18 → 45 days: Jan 17
+    expect(stageOn('2027-01-17', twice)).toBe('known');
+  });
+
+  it('a quiz item’s minutes follow its stage’s levels', () => {
+    const item = plan('2027-01-17', { lectures: [l], sections: [s], sessions: week, attempts: [quizzed(s, '2026-11-15', 1), quizzed(s, '2026-12-03', 0.9)] }).today[0]!;
+    expect(item).toMatchObject({ kind: 'quiz', quizSize: 3, stage: 'known', minutes: 4 }); // 20 + 45 + 120 s
   });
 });
 
@@ -220,22 +250,22 @@ describe('fitting the day', () => {
 
   it('weakest first, then new lectures, then the most overdue', () => {
     const p = plan('2026-11-18', history, 120);
-    expect(summary(p.today)).toEqual([`extra:${weak.id}:20`, `quiz:${weak.id}:7/10q`, `study1:${fresh.id}:20/5q`, `quiz:${ok.id}:4/5q`]);
-    expect(p.plannedMinutes).toBe(51);
+    expect(summary(p.today)).toEqual([`extra:${weak.id}:20`, `quiz:${weak.id}:13/10q`, `study1:${fresh.id}:20/5q`, `quiz:${ok.id}:5/5q`]);
+    expect(p.plannedMinutes).toBe(58);
     expect(p.later).toEqual([]);
   });
 
   it('never more than the daily minutes: what doesn’t fit rolls on', () => {
-    const p = plan('2026-11-18', history, 30);
-    expect(summary(p.today)).toEqual([`extra:${weak.id}:20`, `quiz:${weak.id}:7/10q`]);
-    expect(summary(p.later)).toEqual([`study1:${fresh.id}:20/5q`, `quiz:${ok.id}:4/5q`]);
+    const p = plan('2026-11-18', history, 35); // 30 before #123's quiz times: the weak quiz is now 13 minutes
+    expect(summary(p.today)).toEqual([`extra:${weak.id}:20`, `quiz:${weak.id}:13/10q`]);
+    expect(summary(p.later)).toEqual([`study1:${fresh.id}:20/5q`, `quiz:${ok.id}:5/5q`]);
     expect(p.overBudget).toBe(false);
   });
 
   it('what’s already done today uses up the minutes', () => {
     const p = plan('2026-11-18', { ...history, sessions: [...history.sessions, studied(ok, '2026-11-18', null, 25, 9)] }, 30);
     expect(p.doneMinutes).toBe(25);
-    expect(p.today.map((i) => i.minutes)).toEqual([4]); // only the 4-minute quiz fits in the 5 left
+    expect(p.today.map((i) => i.minutes)).toEqual([5]); // only the 5-minute quiz fits in the 5 left
   });
 
   it('one item bigger than the whole day is still planned, and says so', () => {
@@ -271,25 +301,31 @@ describe('exams pull their sections forward (#86)', () => {
   };
   const midterm = exam('2026-11-28'); // every lecture up to it; its run-up starts Nov 18
 
+  it('in the run-up, its sections are quizzed the exam’s way (#123: stage exam), and timed so', () => {
+    const p = plan('2026-11-18', { ...base, exams: [midterm] });
+    expect(p.today.map((i) => ('stage' in i ? i.stage : null))).toEqual(['exam', 'exam']);
+    expect(plan('2026-11-17', { ...base, attempts: [...base.attempts] }).today).toEqual([]); // nothing due before it
+  });
+
   it('nothing before the run-up; from 10 days before, each section it covers gets a quiz, weakest first', () => {
     expect(plan('2026-11-17', { ...base, exams: [midterm] }).today).toEqual([]);
     const p = plan('2026-11-18', { ...base, exams: [midterm] });
-    expect(summary(p.today)).toEqual([`quiz:${middling.id}:4/5q`, `quiz:${strong.id}:2/3q`]); // each at its own next size
+    expect(summary(p.today)).toEqual([`quiz:${middling.id}:6/5q`, `quiz:${strong.id}:5/3q`]); // each at its own next size
     expect(p.today.every((i) => i.kind === 'quiz' && i.examId === midterm.id)).toBe(true);
     expect(plan('2026-11-18', base).today).toEqual([]); // the same day without the exam
   });
 
   it('the second quiz comes halfway to the exam; after two, no more; nothing on the day', () => {
     const once = { ...base, exams: [midterm], attempts: [...base.attempts, quizzed(strong, '2026-11-18', 0.95)] };
-    expect(summary(plan('2026-11-22', once).today)).toEqual([`quiz:${middling.id}:4/5q`]); // 4 days overdue
-    expect(summary(plan('2026-11-23', once).today)).toEqual([`quiz:${middling.id}:4/5q`, `quiz:${strong.id}:2/3q`]); // Nov 18 + 5
+    expect(summary(plan('2026-11-22', once).today)).toEqual([`quiz:${middling.id}:6/5q`]); // 4 days overdue
+    expect(summary(plan('2026-11-23', once).today)).toEqual([`quiz:${middling.id}:6/5q`, `quiz:${strong.id}:5/3q`]); // Nov 18 + 5
     const twice = { ...once, attempts: [...once.attempts, quizzed(strong, '2026-11-23', 0.95)] };
-    expect(summary(plan('2026-11-25', twice).today)).toEqual([`quiz:${middling.id}:4/5q`]);
+    expect(summary(plan('2026-11-25', twice).today)).toEqual([`quiz:${middling.id}:6/5q`]);
     expect(plan('2026-11-28', { ...base, exams: [midterm] }).today).toEqual([]);
   });
 
   it('only the lectures an exam lists, and only its own class', () => {
-    expect(summary(plan('2026-11-18', { ...base, exams: [exam('2026-11-28', [la.id])] }).today)).toEqual([`quiz:${strong.id}:2/3q`]);
+    expect(summary(plan('2026-11-18', { ...base, exams: [exam('2026-11-28', [la.id])] }).today)).toEqual([`quiz:${strong.id}:5/3q`]);
     expect(plan('2026-11-18', { ...base, exams: [exam('2026-11-28', null, 'other')] }).today).toEqual([]);
   });
 
@@ -298,14 +334,14 @@ describe('exams pull their sections forward (#86)', () => {
     const lc = lecture('2026-11-17');
     const fresh = section(lc);
     const p = plan('2026-11-18', { ...base, lectures: [...base.lectures, lc], sections: [...base.sections, fresh], exams: [midterm] });
-    expect(summary(p.today)).toEqual([`study1:${fresh.id}:17/5q`, `quiz:${middling.id}:4/5q`, `quiz:${strong.id}:2/3q`]);
+    expect(summary(p.today)).toEqual([`study1:${fresh.id}:17/5q`, `quiz:${middling.id}:6/5q`, `quiz:${strong.id}:5/3q`]);
   });
 
   it('planned past the daily minutes, and the plan says which exam did it; other work waits', () => {
     const lo = lecture('2026-11-17', 30);
     const other = { ...section(lo), courseId: 'other' };
     const p = plan('2026-11-18', { ...base, lectures: [...base.lectures, { ...lo, courseId: 'other' }], sections: [...base.sections, other], exams: [midterm] }, 5);
-    expect(summary(p.today)).toEqual([`quiz:${middling.id}:4/5q`, `quiz:${strong.id}:2/3q`]);
+    expect(summary(p.today)).toEqual([`quiz:${middling.id}:6/5q`, `quiz:${strong.id}:5/3q`]);
     expect(p.examsOver.map((e) => e.id)).toEqual([midterm.id]);
     expect(summary(p.later)).toEqual([`study1:${other.id}:10/5q`]);
     expect(plan('2026-11-18', { ...base, exams: [midterm] }, 60).examsOver).toEqual([]); // within the minutes: nothing to say

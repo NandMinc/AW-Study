@@ -128,8 +128,9 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
 - `src/plan/`: the planner (#47), pure, with tests: `planner.ts` works out today's checklist from the
   lectures, study sessions and quiz attempts every time (nothing it works out is stored); `rules.ts` holds
   the numbers (days 1/3/7, the score table) in one place, to tune.
-- `src/quiz/`: quiz logic with tests: `bank.ts` (the bank's size, the AI requests, saving as they arrive) and
-  `pick.ts` (which questions a quiz asks, option order, the score text). Browser tests answer `/ai/` themselves
+- `src/quiz/`: quiz logic with tests: `bank.ts` (the bank's size and its mix of levels, the AI requests with the guide,
+  saving as they arrive), `levels.ts` (#123: a section's stage, each stage's levels, the anchor, time by level) and
+  `pick.ts` (which questions a quiz asks, by level when given a stage; option order, the score text). Browser tests answer `/ai/` themselves
   (`tests/browsers/quiz.spec.ts`, service workers off there), so they never spend usage. Forms use `noValidate` and
   show our own messages; no `<select>` (WebKit's pulls in a stylesheet the CSP blocks). `ConfirmDialog` (never `confirm()`), `settings.ts` (day
   start 4 a.m.).

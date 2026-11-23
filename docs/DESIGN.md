@@ -307,7 +307,12 @@ helper as AI inputs, never stored there.
    points), short answers in attempts, each answer's level and the weighted score; sync for the new records and files.
 2. Helper: the `style` and `grade-many` jobs; levels, forms and the guide in `questions`.
 3. The class page's Exam style: materials, notes, the guide (read, edit, Remake).
-4. Bank, picking and planner: stages, level shares, anchors, time by level.
+4. Bank, picking and planner: stages, level shares, anchors, time by level. **Built (#123):** `src/quiz/levels.ts`
+   (stages, counts, the anchor, time, a bank's mix), the numbers in `RULES.levels`; a bank holds 25% / 35% / 40% of
+   levels 1-3 and asks only for the levels it's missing (so older all-level-2 banks get levels 1 and 3 added);
+   making questions first brings the guide up to date (`guideForQuestions`: a failed guide never stops questions,
+   they're made without it); each Play item carries its stage; banks get no short answers until #124
+   (`RULES.levels.shortAnswers`). Exam practice still picks its multiple choice as before.
 5. The quiz screen: short answers, marking at the end, the multiple-choice-only fallback.
 
 ## The slide viewer

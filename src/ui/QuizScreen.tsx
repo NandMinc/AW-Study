@@ -6,7 +6,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AiError } from '../ai/backend';
 import { signInUrl } from '../ai/http';
-import { bankTarget, fillBank, sectionSlides, type BankProgress } from '../quiz/bank';
+import { bankTarget, fillBank, guideForQuestions, sectionSlides, type BankProgress } from '../quiz/bank';
+import { sectionStage } from '../quiz/levels';
 import { describeScore, pickQuiz, QUIZ_SIZE, type QuizItem } from '../quiz/pick';
 import type { Course, Section, SlideDeck } from '../types/lecture';
 import type { OptionIndex, Question, QuizAttempt } from '../types/quiz';
@@ -85,7 +86,7 @@ export default function QuizScreen({ courseId, sectionId, compare = false }: { c
           setting={setting}
           questions={questions}
           attempts={attempts}
-          onStart={() => setQuiz({ items: pickQuiz(questions, attempts, QUIZ_SIZE), startedAt: new Date().toISOString() })}
+          onStart={() => setQuiz({ items: pickQuiz(questions, attempts, QUIZ_SIZE, Math.random, sectionStage(attempts)), startedAt: new Date().toISOString() })}
           onBankChanged={reload}
           comparing={compare}
         />
@@ -131,7 +132,9 @@ export function Start({
     abort.current = new AbortController();
     setProgress({ done: 0, total: 0, added: 0 });
     try {
-      await fillBank({ ai, store, section: setting.section, pageTexts: setting.pageTexts, onProgress: setProgress, signal: abort.current.signal });
+      // The class's guide brought up to date first (#123; sends nothing when it's current), then the questions follow it
+      const guide = await guideForQuestions(store, ai, setting.course.id, abort.current.signal);
+      await fillBank({ ai, store, section: setting.section, pageTexts: setting.pageTexts, guide, onProgress: setProgress, signal: abort.current.signal });
     } catch (err) {
       if (!(err instanceof AiError && err.code === 'cancelled')) {
         setProblem({ message: messageOf(err), signIn: err instanceof AiError && err.code === 'signed-out' });

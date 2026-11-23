@@ -135,12 +135,12 @@ describe('statuses', () => {
 });
 
 describe('the progress bar', () => {
-  // bio: 17 min of slides + a 4-minute quiz = 21; hist: a 4-minute quiz. 25 in all.
+  // bio: 17 min of slides + a 6-minute quiz = 23; hist: a 6-minute quiz (both 5 questions, new: #123). 29 in all.
   it('starts empty, creeps with slide time (up to 80% of it), and fills only with the quizzes', () => {
     expect(day().progress).toBe(0);
-    expect(day({ sessions: [...histWeek, studied(bio, TODAY, 1, 10)] }).progress).toBeCloseTo(8 / 25); // 10 min x 0.8
-    expect(day({ sessions: [...histWeek, studied(bio, TODAY, 1, 40)] }).progress).toBeCloseTo(13.6 / 25); // at most 17 x 0.8
-    expect(day({ sessions: [...histWeek, studied(bio, TODAY, 1, 17)], attempts: [quizzed(bio, TODAY, 1)] }).progress).toBeCloseTo(21 / 25);
+    expect(day({ sessions: [...histWeek, studied(bio, TODAY, 1, 10)] }).progress).toBeCloseTo(8 / 29); // 10 min x 0.8
+    expect(day({ sessions: [...histWeek, studied(bio, TODAY, 1, 40)] }).progress).toBeCloseTo(13.6 / 29); // at most 17 x 0.8
+    expect(day({ sessions: [...histWeek, studied(bio, TODAY, 1, 17)], attempts: [quizzed(bio, TODAY, 1)] }).progress).toBeCloseTo(23 / 29);
     expect(day({ sessions: [...histWeek, studied(bio, TODAY, 1, 17)], attempts: [quizzed(bio, TODAY, 1), quizzed(hist, TODAY, 1)] }).progress).toBe(1);
   });
 
