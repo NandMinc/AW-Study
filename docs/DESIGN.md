@@ -186,6 +186,18 @@ made, so new material is studied the way the exam tests it and well-known materi
   Each has a kind the student picks (outline, past exam, practice, other), because a past exam is the strongest
   signal and the guide should weigh it that way.
 - On the class's page under **Exam style**: the materials, the notes box, and the guide.
+- **Built (#122, Nov 22):** the class page has an **Exam style** part (also in the Classes page's menu,
+  `#/class/<id>/style`). **Documents:** add a PDF or a text file, then say what it is (past exam, outline or
+  syllabus, practice set, other); edit its title or kind; delete it. **Notes:** a box and Save notes. **The guide:**
+  what the exam tests, the three levels, and the share of short answers; **Edit the guide**, **Remake**.
+- **Made only when the student acts** (SECURITY.md: nothing is sent unless asked for): **Write the guide** or
+  **Remake**, or adding or deleting a document or saving notes in this part, which says its text goes to the AI
+  for the guide. Opening the class page sends nothing; it says when the guide is out of date (a document added
+  or removed, the notes changed, or 2 or more lectures it hasn't seen; `src/quiz/guide.ts`). New lectures bring
+  a remake when questions are made for them (#123 calls `refreshGuide`, part of making questions the student
+  asked for). If making it fails, the page says why and waits. A class with nothing but pictures sends nothing.
+  A document whose text can't be read right now (synced, not downloaded, offline) is left out but counts as
+  seen. Editing the guide isn't a reason to remake it.
 
 **The exam style guide**
 
@@ -434,7 +446,8 @@ The prototype is usable for real studying after **6**. Each milestone becomes `a
 
 Tick a question once Matt and Nathan agree, and write the answer under it.
 
-- [ ] **After-class prompts:** a real notification on your phone needs the server to send pushes (and to know your class times). For the prototype, is asking *when you next open the app* enough, with push later?
+- [x] **After-class prompts:** a real notification on your phone needs the server to send pushes (and to know your class times). For the prototype, is asking *when you next open the app* enough, with push later?
+    - Matt (Nov 22): yes, a popup when Honed opens, linking to the lecture to fill in (#129). Push maybe later.
 - [ ] **Motivation:** the first design had a daily ring, streaks and combos. Keep those ideas for the checklist and Play (e.g. the ring fills as today's list gets done), or leave them for later with leaderboards?
 - [ ] **Default daily minutes:** 60? And should some classes get more of the time than others (e.g. a weight per class)?
     - For now (Nov 18, #47): 60, changed in Settings. No weights per class yet.

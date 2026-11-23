@@ -1,5 +1,6 @@
 // One class: its lecture times and term, "What was covered?" (with a prompt for the latest lecture
-// when it hasn't been filled in), its lectures and their slides, its exams, and its slide decks.
+// when it hasn't been filled in), its lectures and their slides, its exams, its exam style (#122) and its
+// slide decks.
 // The class menu on the Classes page opens it at one part (`part`: scrolled to it, or the class
 // editor for "details"), and a lecture's date button opens "What was covered?" for that date (`cover`),
 // going back to the Classes page when it's saved or cancelled.
@@ -13,6 +14,7 @@ import { describeMeetings, formatDate, latestLecture, lectureMinutesOn, orderSec
 import { ClassEditor } from './ClassEditor';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ExamEditor, KIND_NAMES } from './ExamEditor';
+import { ExamStyleSection } from './ExamStyleSection';
 import { LectureForm } from './LectureForm';
 import { PdfProblem, readPdfFile } from './pdf-file';
 import { go, href, type ClassPart } from './route';
@@ -275,6 +277,11 @@ export function ClassScreen({ courseId, part, cover }: { courseId: string; part?
           Add an exam
         </button>
       )}
+
+      <h3 id="class-style" tabIndex={-1}>
+        Exam style
+      </h3>
+      <ExamStyleSection courseId={courseId} lectureIds={lectures.map((l) => l.lecture.id)} />
 
       <h3 id="class-files" tabIndex={-1}>
         Slide decks

@@ -575,6 +575,30 @@ label.file input {
   }
 }
 
+/* --- A class's exam style (#122) --- */
+
+.exam-style h4 {
+  margin: 0.75rem 0 0;
+}
+
+.guide-tests {
+  margin: 0;
+  white-space: pre-line; /* the guide's own line breaks */
+}
+
+.guide-levels {
+  margin: 0;
+}
+
+.guide-levels dt {
+  font-weight: 600;
+}
+
+.guide-levels dd {
+  margin: 0 0 0.5rem;
+  white-space: pre-line;
+}
+
 /* --- Quizzes (#40) --- */
 
 .quiz .question {
