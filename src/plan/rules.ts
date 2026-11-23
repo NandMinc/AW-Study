@@ -35,7 +35,7 @@ export const RULES = {
    * shares: new (first week, or the last score under weakScore), learning, known (the last `knownQuizzes` scores
    * all at least `knownScore`, and no exam-style question missed in the last), exam (in an exam's run-up). A
    * known quiz always has one exam-style question (the anchor). `seconds` is each level's time in the day's plan.
-   * `shortAnswers`: whether banks get short-answer questions (off until the quiz screen asks them, #124).
+   * `shortAnswers`: whether banks get short-answer questions (on since #124: the quiz screen asks them).
    */
   levels: {
     bankShares: [0.25, 0.35, 0.4],
@@ -48,7 +48,7 @@ export const RULES = {
     knownScore: 0.9,
     knownQuizzes: 2,
     seconds: [20, 45, 120],
-    shortAnswers: false,
+    shortAnswers: true,
   },
   /** DESIGN's score table, highest band first: what a quiz's score sets for the next one. (The 90% band's
    * 3-day minimum never bites while gaps are whole days: 2.5 x 1 day already rounds to 3.) */

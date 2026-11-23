@@ -64,7 +64,8 @@ slides" and "M6: AI helper and quizzes":
 | Design: exam style guide per class, question levels, short answers in quizzes | #117 | Nathan's Claude | `docs/DESIGN.md` ("Exam style and question levels", the Quizzes decision, two open questions) | **Done** (PR #119, Matt's OK); built in #120-#124. Scores weighted by level; "File types to support" list (Nathan, Nov 22) |
 | Exam style 1: contract and storage | #120 | Nathan's Claude | new `src/types/style.ts`; `Level`, `ChoiceQuestion`/`ShortQuestion`, `ShortAnswer`, the weighted score in `src/types/quiz.ts`; `src/db/quiz.ts` (forms, levels, short answers, weighted score); `pickQuiz` multiple choice only for now; then the materials and guide storage in `src/db/` and sync | Contract and quiz storage **done** (PR #126); materials and guide storage **this PR** (schema step 9, `src/db/style.ts`, sync incl. the sync server) |
 | Claiming tasks only with `tools/claim-task.mjs` | #133 | Nathan's Claude | `tools/claim-task.mjs`, `tests/claim-task.test.mjs`, "Taking a task" in `CLAUDE.md` | **Done** (PR #134, Matt's OK) |
-| Exam style 2: helper | Exam style 4: bank, picking and planner by level | #123 | Nathan's Claude | new `src/quiz/levels.ts` (+ test), `RULES.levels`, `src/quiz/bank.ts`, `src/quiz/pick.ts`, the stage and timing in `src/plan/planner.ts` and `tasks.ts`, the stage in `PlayScreen`/`QuizScreen`, the guide before questions in `bank-jobs.tsx`/`QuizScreen`, `answerStyle` in `tests/browsers/fixtures.ts`, `tests/browsers/levels.spec.ts` | **Done** (this PR) |
+| Exam style 2: helper | Exam style 4: bank, picking and planner by level | #123 | Nathan's Claude | new `src/quiz/levels.ts` (+ test), `RULES.levels`, `src/quiz/bank.ts`, `src/quiz/pick.ts`, the stage and timing in `src/plan/planner.ts` and `tasks.ts`, the stage in `PlayScreen`/`QuizScreen`, the guide before questions in `bank-jobs.tsx`/`QuizScreen`, `answerStyle` in `tests/browsers/fixtures.ts`, `tests/browsers/levels.spec.ts` | **Done** (PR #135) |
+| Exam style 5: short answers in quizzes | #124 | Nathan's Claude | `RULES.levels.shortAnswers` on, `pickQuiz`'s short answers, new `src/quiz/start.ts` (+ test), the `Quiz` component in `QuizScreen.tsx` (typed answers, marking at the end), `describeScore`'s weighted percentage, `PlayScreen`, `tests/browsers/short-answers.spec.ts` | **Done** (this PR) |
 jobs (`style`, `grade-many`, levels and forms in `questions`) | #121 | Matt's Claude | `helper/jobs.mjs`, `tests/helper/`, `src/ai/` (backend, http, fake, check, new `style.ts`), the filter in `CompareModels.tsx` | **Done** (PR #127). **The helper changed: press Update for `honed-ai`** |
 | Exam style 3: the class page's Exam style (documents, notes, the guide) | #122 | Matt's Claude | new `src/ui/ExamStyleSection.tsx`, `src/quiz/guide.ts`, `readMaterialFile` in `src/ui/pdf-file.ts`, the `style` part in `route.ts` and `ClassMenu.tsx`, its place in `ClassScreen.tsx`, the exam style styles, `tests/browsers/exam-style.spec.ts` | **Done** (PR #130) |
 | After-class reminder: a popup when Honed opens links to the lecture to fill in | #129 | Matt's Claude | new `src/ui/AfterClass.tsx` and `src/ui/after-class.ts` (+ tests), its place in `src/App.tsx`, `tests/browsers/after-class.spec.ts` | **Done** (PR #132). Try on a real phone after deploy |
@@ -151,6 +152,12 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 22 (#124):** Short answers in quizzes. Banks get them (the guide's share of level 3); a quiz whose bank has them first
+  checks the helper's whoami (no AI used, 5 s at most) and otherwise goes multiple choice only with a note saying why; typed
+  answers (no instant feedback) are marked in one `grade-many` request at the end, a blank one 0 and never sent; the results show
+  each mark, its feedback and a full answer's points; a failed marking offers Try marking again or Save without them, never a
+  made-up mark. Also: the results' percentage is now the weighted score (`describeScore(right, asked, score)`; since #120 it had
+  still shown the plain one). Exam practice is unchanged. 9 deliberate breaks, all caught. **The exam style plan (#117) is built.**
 - **Nov 22 (#123):** Quizzes by level. A section's stage (new: first week or last score under 70%; known: last two 90%+ and no
   exam-style question missed in the last; exam: in an exam's run-up; learning otherwise) sets each quiz's levels
   (`RULES.levels.stageShares`), a known quiz always has one exam-style question (the anchor), a level short of questions borrows from

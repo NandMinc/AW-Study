@@ -215,7 +215,7 @@ export function ClassScreen({ courseId, part, cover }: { courseId: string; part?
                           {lastQuiz.get(s.id) && (
                             <span className="muted small" data-testid="section-last-quiz">
                               {' '}
-                              (last: {describeScore(lastQuiz.get(s.id)!.right, lastQuiz.get(s.id)!.asked)})
+                              (last: {describeScore(lastQuiz.get(s.id)!.right, lastQuiz.get(s.id)!.asked, lastQuiz.get(s.id)!.score)})
                             </span>
                           )}
                         </li>

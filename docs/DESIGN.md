@@ -304,7 +304,13 @@ helper as AI inputs, never stored there.
    making questions first brings the guide up to date (`guideForQuestions`: a failed guide never stops questions,
    they're made without it); each Play item carries its stage; banks get no short answers until #124
    (`RULES.levels.shortAnswers`). Exam practice still picks its multiple choice as before.
-5. The quiz screen: short answers, marking at the end, the multiple-choice-only fallback.
+5. The quiz screen: short answers, marking at the end, the multiple-choice-only fallback. **Built (#124):** banks get
+   short answers (the guide's share of level 3); before a quiz whose bank has them, the helper's whoami is checked
+   (no AI used; 5 s at most), and if it can't be reached the quiz is multiple choice only and says why
+   (`src/quiz/start.ts`); short answers are typed (one or two sentences, up to 1,000 characters), not marked one by
+   one, then all marked in one `grade-many` request at the end (a blank one is 0 and never sent), with each mark,
+   its feedback and the points of a full answer on the results. If marking fails: Try marking again, or Save without
+   them (they don't count). The results' percentage is the weighted score (it was the plain one until #124).
 
 ## The slide viewer
 

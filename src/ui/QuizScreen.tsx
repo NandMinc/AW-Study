@@ -4,11 +4,13 @@
 // explanation and the slide it comes from (shown right here). The attempt is saved when the quiz ends.
 // Loaded on demand with the viewer (PDF.js), like SlidesScreen.
 import { useEffect, useRef, useState } from 'react';
-import { AiError } from '../ai/backend';
+import { SHORT_TYPED_MAX } from '../db/quiz';
+import { AiError, type Grade } from '../ai/backend';
 import { signInUrl } from '../ai/http';
 import { bankTarget, fillBank, guideForQuestions, sectionSlides, type BankProgress } from '../quiz/bank';
 import { sectionStage } from '../quiz/levels';
-import { describeScore, pickQuiz, QUIZ_SIZE, type QuizItem } from '../quiz/pick';
+import { describeScore, isShortItem, QUIZ_SIZE, type PickedItem, type QuizItem, type ShortItem } from '../quiz/pick';
+import { startQuiz, type StartedQuiz } from '../quiz/start';
 import type { Course, Section, SlideDeck } from '../types/lecture';
 import type { OptionIndex, Question, QuizAttempt } from '../types/quiz';
 import { SlideViewer } from '../viewer/SlideViewer';
@@ -29,7 +31,10 @@ export interface Setting {
   pageTexts: string[];
 }
 
-type Answered = { item: QuizItem; shown: number; chosen: OptionIndex; right: boolean; ms: number };
+type ChoiceAnswered = { kind: 'choice'; item: QuizItem; shown: number; chosen: OptionIndex; right: boolean; ms: number };
+/** A short answer (#124): kept as typed, marked by the AI with the others when the quiz ends. */
+type ShortAnswered = { kind: 'short'; item: ShortItem; typed: string; ms: number };
+type Answered = ChoiceAnswered | ShortAnswered;
 
 /** `compare`: opened from Settings' Compare models, with the comparison already showing. */
 export default function QuizScreen({ courseId, sectionId, compare = false }: { courseId: string; sectionId: string; compare?: boolean }) {
@@ -46,7 +51,8 @@ export default function QuizScreen({ courseId, sectionId, compare = false }: { c
     ]);
     return { setting: { course, section, deck, pageTexts } satisfies Setting, questions, attempts };
   }, [store, courseId, sectionId]);
-  const [quiz, setQuiz] = useState<{ items: QuizItem[]; startedAt: string } | null>(null);
+  const ai = useAi();
+  const [quiz, setQuiz] = useState<StartedQuiz | null>(null);
 
   if (error) return <p className="error">{error}</p>;
   if (data === undefined) return <p className="muted">Loading…</p>;
@@ -76,6 +82,7 @@ export default function QuizScreen({ courseId, sectionId, compare = false }: { c
           setting={setting}
           items={quiz.items}
           startedAt={quiz.startedAt}
+          note={quiz.note}
           onAgain={async () => {
             setQuiz(null);
             await reload();
@@ -86,7 +93,7 @@ export default function QuizScreen({ courseId, sectionId, compare = false }: { c
           setting={setting}
           questions={questions}
           attempts={attempts}
-          onStart={() => setQuiz({ items: pickQuiz(questions, attempts, QUIZ_SIZE, Math.random, sectionStage(attempts)), startedAt: new Date().toISOString() })}
+          onStart={async () => setQuiz(await startQuiz(ai, questions, attempts, QUIZ_SIZE, sectionStage(attempts)))}
           onBankChanged={reload}
           comparing={compare}
         />
@@ -163,7 +170,7 @@ export function Start({
       )}
       {last && (
         <p className="muted" data-testid="last-score">
-          Last quiz: {describeScore(last.right, last.asked)}
+          Last quiz: {describeScore(last.right, last.asked, last.score)}
         </p>
       )}
       {progress ? (
@@ -228,29 +235,49 @@ export function Quiz({
   setting,
   items,
   startedAt,
+  note = null,
   onAgain,
   doneLabel = 'Done',
   backLink = true,
 }: {
   setting: Setting;
-  items: QuizItem[];
+  items: PickedItem[];
   startedAt: string;
-  onAgain: (attempt: QuizAttempt) => void;
+  /** Why this quiz has no short answers when its bank does (#124: the AI couldn't be reached to mark them). */
+  note?: string | null;
+  /** Done: the saved attempt, or null when nothing could be saved (only short answers, and marking failed). */
+  onAgain: (attempt: QuizAttempt | null) => void;
   doneLabel?: string;
   /** "Back to <class>" beside Done (not in a study session, where Done goes on). */
   backLink?: boolean;
 }) {
   const store = useStore();
+  const ai = useAi();
   const [index, setIndex] = useState(0);
   const [answered, setAnswered] = useState<Answered[]>([]);
+  const [typed, setTyped] = useState('');
   const [showSlide, setShowSlide] = useState(false);
   const [pdf, setPdf] = useState<Uint8Array | null>(null);
   const [saved, setSaved] = useState<QuizAttempt | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // Short answers (#124): marked by the AI in one request at the end; `marks` in the order they were asked
+  const [marks, setMarks] = useState<Grade[] | null>(null);
+  const [marking, setMarking] = useState<{ state: 'running' } | { state: 'failed'; message: string; signIn: boolean } | null>(null);
+  const [withoutShort, setWithoutShort] = useState(false);
   const shownAt = useRef(performance.now());
+  const abort = useRef<AbortController | null>(null);
+  useEffect(() => () => abort.current?.abort(), []);
   const [done, setDone] = useState(false); // after "See your score", not as soon as the last answer is in
 
-  const save = async (all: Answered[]) => {
+  const choicesOf = (all: Answered[]) => all.filter((a): a is ChoiceAnswered => a.kind === 'choice');
+  const shortsOf = (all: Answered[]) => all.filter((a): a is ShortAnswered => a.kind === 'short');
+  const choices = choicesOf(answered);
+  const shorts = shortsOf(answered);
+
+  // Both take the whole list: the last answer may have been added in the same click (a short answer's Next)
+  const save = async (all: Answered[], shortMarks: Grade[] | null) => {
+    const choices = choicesOf(all);
+    const shorts = shortsOf(all);
     setProblem(null);
     try {
       setSaved(
@@ -258,7 +285,10 @@ export function Quiz({
           sectionId: setting.section.id,
           startedAt,
           finishedAt: new Date().toISOString(),
-          answers: all.map((a) => ({ questionId: a.item.question.id, chosen: a.chosen, ms: a.ms })),
+          answers: choices.map((a) => ({ questionId: a.item.question.id, chosen: a.chosen, ms: a.ms })),
+          ...(shortMarks && shorts.length > 0 && {
+            short: shorts.map((a, i) => ({ questionId: a.item.question.id, typed: a.typed, mark: shortMarks[i]!.mark, feedback: shortMarks[i]!.feedback, ms: a.ms })),
+          }),
         }),
       );
     } catch (err) {
@@ -266,25 +296,118 @@ export function Quiz({
     }
   };
 
+  /** Marks the short answers (a blank one is 0 and never sent), then saves. */
+  const markAndSave = async (all: Answered[]) => {
+    const shorts = shortsOf(all);
+    if (shorts.length === 0) return save(all, null);
+    setMarking({ state: 'running' });
+    abort.current = new AbortController();
+    try {
+      const sent = shorts.map((a, i) => ({ a, i })).filter(({ a }) => a.typed.trim() !== '');
+      const pages = new Set(sent.flatMap(({ a }) => [a.item.question.page - 1, a.item.question.page, a.item.question.page + 1]));
+      const grades = sent.length
+        ? await ai.gradeMany(
+            {
+              slides: sectionSlides(setting.section, setting.pageTexts).filter((s) => pages.has(s.page)),
+              items: sent.map(({ a }) => ({ question: a.item.question.question, points: a.item.question.points, answer: a.typed.trim(), page: a.item.question.page })),
+            },
+            abort.current.signal,
+          )
+        : [];
+      const graded: Grade[] = shorts.map((a) => ({ mark: 0, outOf: a.item.question.points.length, feedback: 'No answer.' }));
+      sent.forEach(({ i }, k) => (graded[i] = grades[k]!));
+      setMarks(graded);
+      setMarking(null);
+      await save(all, graded);
+    } catch (err) {
+      if (err instanceof AiError && err.code === 'cancelled') return;
+      setMarking({ state: 'failed', message: messageOf(err), signIn: err instanceof AiError && err.code === 'signed-out' });
+    } finally {
+      abort.current = null;
+    }
+  };
+
   if (done) {
-    const missed = answered.filter((a) => !a.right);
+    const missed = choices.filter((a) => !a.right);
+    const failed = marking?.state === 'failed' ? marking : null;
     return (
       <div className="stack" data-testid="quiz-done">
         {saved ? (
           <p className="score" data-testid="quiz-score">
-            {describeScore(saved.right, saved.asked)}
+            {describeScore(saved.right, saved.asked, saved.score)}
           </p>
+        ) : marking?.state === 'running' ? (
+          <p className="muted" role="status">
+            Marking your short answers…
+          </p>
+        ) : failed ? (
+          <div className="stack">
+            <p className="error" role="alert">
+              Your short answers couldn’t be marked: {failed.message}
+            </p>
+            {failed.signIn && (
+              <p className="muted">
+                <a href={signInUrl()} target="_blank" rel="noopener">
+                  Sign in for AI
+                </a>{' '}
+                (opens a new tab: sign in with Google, close it, then press Try marking again).
+              </p>
+            )}
+            <div className="row">
+              <button type="button" className="primary" onClick={() => void markAndSave(answered)}>
+                Try marking again
+              </button>
+              {choices.length > 0 && (
+                <button type="button" onClick={() => (setWithoutShort(true), setMarking(null), void save(answered, null))}>
+                  Save without them
+                </button>
+              )}
+            </div>
+            <p className="muted small">
+              {choices.length > 0
+                ? 'Saved without them, the short answers don’t count. Your multiple-choice answers are kept either way.'
+                : 'This quiz was only short answers, so there’s nothing to save without them.'}
+            </p>
+          </div>
         ) : problem ? (
           <>
             <p className="error" role="alert">
               Couldn’t save this quiz: {problem}
             </p>
-            <button type="button" onClick={() => void save(answered)}>
+            <button type="button" onClick={() => void save(answered, withoutShort ? null : marks)}>
               Try saving again
             </button>
           </>
         ) : (
           <p className="muted">Saving…</p>
+        )}
+        {marks && shorts.length > 0 && (
+          <>
+            <h3>Your short answers</h3>
+            <ul className="list" data-testid="short-results">
+              {shorts.map((a, i) => (
+                <li key={a.item.question.id} className="item">
+                  <div className="item-main stack">
+                    <span>
+                      <MathText text={a.item.question.question} />
+                    </span>
+                    <span className="small prewrap">{a.typed.trim() || 'No answer.'}</span>
+                    <span className="small" data-testid="short-mark">
+                      {marks[i]!.mark} of {marks[i]!.outOf}: {marks[i]!.feedback}
+                    </span>
+                    {marks[i]!.mark < marks[i]!.outOf && (
+                      <span className="muted small">
+                        A full answer says: {a.item.question.points.join('; ')}.{' '}
+                        <a href={href({ name: 'slides', courseId: setting.course.id, deckId: setting.deck.id, first: a.item.question.page, last: a.item.question.page })}>
+                          slide {a.item.question.page}
+                        </a>
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
         {missed.length > 0 && (
           <>
@@ -309,7 +432,12 @@ export function Quiz({
           </>
         )}
         <div className="row">
-          <button type="button" className="primary" onClick={() => saved && onAgain(saved)} disabled={!saved}>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => onAgain(saved)}
+            disabled={!saved && !(failed && choices.length === 0)}
+          >
             {doneLabel}
           </button>
           {backLink && (
@@ -323,24 +451,18 @@ export function Quiz({
   }
 
   const item = items[index]!;
-  const { question } = item;
   const current = answered[index];
+  const last = index + 1 >= items.length;
 
-  const choose = (shown: number) => {
-    if (current) return;
-    const chosen = item.order[shown]!;
-    const next = [...answered, { item, shown, chosen, right: chosen === question.answer, ms: performance.now() - shownAt.current }];
-    setAnswered(next);
-  };
-
-  const goOn = () => {
+  const goOn = (all: Answered[]) => {
     setShowSlide(false);
-    if (index + 1 < items.length) {
+    setTyped('');
+    if (!last) {
       setIndex(index + 1);
       shownAt.current = performance.now();
     } else {
       setDone(true);
-      void save(answered);
+      void markAndSave(all);
     }
   };
 
@@ -349,28 +471,74 @@ export function Quiz({
     if (!pdf) setPdf(await store.getSlideDeckFile(setting.deck.id));
   };
 
-  return (
-    <div className="stack quiz" data-testid="quiz-question">
+  const header = (
+    <>
+      {note && index === 0 && (
+        <p className="muted small" data-testid="quiz-note">
+          {note}
+        </p>
+      )}
       <p className="muted small" data-testid="quiz-position">
         Question {index + 1} of {items.length}
       </p>
+    </>
+  );
+
+  if (isShortItem(item)) {
+    const { question } = item;
+    // Answered on Next: the answer is kept as typed, marked with the others at the end
+    const next = () => {
+      const all: Answered[] = [...answered, { kind: 'short', item, typed: typed.slice(0, SHORT_TYPED_MAX), ms: performance.now() - shownAt.current }];
+      setAnswered(all);
+      goOn(all);
+    };
+    return (
+      <div className="stack quiz" data-testid="quiz-question">
+        {header}
+        <p className="question">
+          <MathText text={question.question} />
+        </p>
+        <label htmlFor={`short-${question.id}`} className="muted small">
+          Your answer: a sentence or two. It’s marked when the quiz ends.
+        </label>
+        <textarea id={`short-${question.id}`} rows={4} maxLength={SHORT_TYPED_MAX} value={typed} autoFocus onChange={(e) => setTyped(e.target.value)} />
+        <div className="row">
+          <button type="button" className="primary" onClick={next}>
+            {last ? 'See your score' : 'Next question'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const { question } = item;
+  const currentChoice = current?.kind === 'choice' ? current : undefined;
+  const choose = (shown: number) => {
+    if (current) return;
+    const chosen = item.order[shown]!;
+    setAnswered([...answered, { kind: 'choice', item, shown, chosen, right: chosen === question.answer, ms: performance.now() - shownAt.current }]);
+  };
+
+  return (
+    <div className="stack quiz" data-testid="quiz-question">
+      {header}
       <p className="question">
         <MathText text={question.question} />
       </p>
       <div className="options" role="group" aria-label="Answers">
         {item.order.map((stored, shown) => {
-          const state = !current ? '' : stored === question.answer ? 'right' : shown === current.shown ? 'wrong' : 'other';
+          const state = !currentChoice ? '' : stored === question.answer ? 'right' : shown === currentChoice.shown ? 'wrong' : 'other';
           return (
-            <button key={stored} type="button" className={`option ${state}`} disabled={!!current} aria-pressed={current?.shown === shown} onClick={() => choose(shown)}>
+            <button key={stored} type="button" className={`option ${state}`} disabled={!!current} aria-pressed={currentChoice?.shown === shown} onClick={() => choose(shown)}>
               <span className="letter">{LETTERS[shown]}</span> <MathText text={question.options[stored]} />
             </button>
           );
         })}
       </div>
-      {current && (
+      {currentChoice && (
         <div className="stack feedback" role="status" data-testid="quiz-feedback">
-          <p className={current.right ? 'verdict right' : 'verdict wrong'}>
-            {current.right ? (
+          <p className={currentChoice.right ? 'verdict right' : 'verdict wrong'}>
+            {currentChoice.right ? (
               'Right.'
             ) : (
               <>
@@ -384,8 +552,8 @@ export function Quiz({
             </p>
           )}
           <div className="row">
-            <button type="button" className="primary" onClick={goOn} autoFocus>
-              {index + 1 < items.length ? 'Next question' : 'See your score'}
+            <button type="button" className="primary" onClick={() => goOn(answered)} autoFocus>
+              {last ? 'See your score' : 'Next question'}
             </button>
             {!showSlide && (
               <button type="button" onClick={() => void openSlide()}>
