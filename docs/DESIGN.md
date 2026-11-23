@@ -18,7 +18,7 @@ Code: [github.com/NandMinc/AW-Study](https://github.com/NandMinc/AW-Study).
 | --- | --- |
 | Where data lives | In the app, on each device, encrypted. **Accounts and sync (v2) are designed** (Nov 20, #93: `docs/SECURITY.md`, "Accounts and sync"), opt-in, first for testers on Nathan's home server; not built yet. |
 | AI | Matt's and Nathan's Claude subscriptions, through Claude Code running in a locked-down helper on Nathan's home server (each person's own token). Not for other users. |
-| Quizzes | Multiple choice for normal studying (graded instantly, no AI). Short answers, graded by AI, for tests and exam practice. |
+| Quizzes | Multiple choice for normal studying (graded instantly, no AI). Short answers, graded by AI, for tests and exam practice. **Designed Nov 22 (#117):** questions follow a per-class exam style guide and have levels; regular quizzes may include short answers (two sentences at most), marked by the AI at the end. |
 | Slide formats | PDF only for the prototype. Faithful PowerPoint viewing matters later, because exporting some decks to PDF mangles them. |
 | Study budget | A lecture's length becomes its first study budget, spread over its first week; quiz results take over after that. Can change. |
 | Low scores | A low score marks the section as needing more study, and the planner adds study time in the coming days. It never sends you back into the slides on the spot. |
@@ -157,6 +157,107 @@ A session is the slides for most of its time, then a quiz; the quiz is what move
 - A practice counts as that section's quiz for the day, so it ticks off the section's item on Tasks.
 
 **Keeping it honest:** the score comes from your answers, never from how long you looked at the slides, so the schedule reflects what you actually know.
+
+## Exam style and question levels (#117, designed Nov 22, not built)
+
+Nathan, Nov 22: one of the AI's strengths is reading a course and working out what its exam will ask. So each class
+keeps an **exam style guide** that every new batch of questions follows, and each question gets a **level** when it's
+made, so new material is studied the way the exam tests it and well-known material gets quick, easy checks.
+
+**Class materials**
+
+- Besides its slides, a class can hold **other documents**: a course outline or syllabus, past exams, practice sets,
+  assignment sheets (PDFs and plain text files for now; Word and PowerPoint later, see The slide viewer), and **the
+  student's notes** about the exam ("the prof said: no proofs, two essay questions, formula sheet given").
+- Kept like slides: encrypted on the device, synced (opt-in) as files on demand, text read on the device (PDF.js).
+  Each has a kind the student picks (outline, past exam, practice, other), because a past exam is the strongest
+  signal and the guide should weigh it that way.
+- On the class's page under **Exam style**: the materials, the notes box, and the guide.
+
+**The exam style guide**
+
+- A short text (at most about 3,000 characters) the AI writes for the class, with three parts:
+  1. **What the exam tests:** topics that matter most, the kinds of questions (recall, explaining, calculating,
+     applying a method to a new case), formats (multiple choice, short answer, problems), notation and conventions.
+  2. **What each level looks like in this class** (below): e.g. for calculus, level 3 "differentiate
+     \(3x^4 - 2x\) with the power rule", level 1 "which rule would you use for \(x^5\)?"; for history, level 3
+     "explain in one or two sentences why the treaty failed", level 1 multiple choice on who signed it.
+  3. **The mix:** how much of each level and form suits this class (a recall-only class has few worked problems).
+- Made by a new AI job, **style**, from the class's name, the notes, the materials' text (past exams first, then
+  outlines, then the rest, cut to a limit), a sample of the slides (each lecture's text, cut to fit), and the
+  previous guide. Remade when a material or the notes change, and after a new lecture's slides when the guide
+  hasn't seen 2 or more of the class's lectures (one request each time; about once a week for most classes).
+- The student can **read and edit** it. Once edited, a remake gets the edited version as its previous guide and is
+  told to keep the student's changes. **Remake** is a button.
+- Every questions request sends the guide with the slides. Exam practice uses it too.
+- A class with no guide yet (no slides) gets questions as today, and the first section's questions wait for the guide
+  (one request just before).
+
+**Levels**
+
+The AI gives each question a level when it writes it, following the guide's descriptions:
+
+| Level | What it asks | Form | Time counted |
+| --- | --- | --- | --- |
+| 1 Recognise | Recall or recognise: a term, a fact, which rule or method applies, what a result means | Multiple choice | 20 s |
+| 2 Apply | One or two steps of reasoning, a short calculation, applying an idea to a stated case | Multiple choice | 45 s |
+| 3 Exam-style | What the exam would ask: a full worked problem, or "explain why", "compare", "what happens if" | Multiple choice (worked problems, wrong options = common mistakes) or a **short answer** | 2 min |
+
+Three levels because the AI can tell them apart reliably; a finer scale would be noise. Questions made before
+this count as level 2, multiple choice.
+
+**Short answers in regular quizzes**
+
+- Level 3 only, when the guide says the exam asks for explanations (a history class gets many, calculus few).
+- Kept short (Nathan, Nov 22): the question asks for **at most two sentences**, preferably one, with 1 to 3 points a
+  full answer makes, so marking is quick and cheap.
+- Banked like multiple choice (written once, asked many times), unlike exam practice's, which are written fresh.
+- **Marked by the AI** against their points, **all of a quiz's short answers in one request at the end** (a new
+  job, `grade-many`), not one request each. The results screen shows each mark with its feedback; multiple-choice
+  feedback stays instant.
+- Counted like exam practice's: one question worth mark ÷ points.
+- **Offline or the helper unreachable** when a quiz starts: the quiz uses multiple choice only, and says so. If
+  marking fails at the end, the multiple-choice part is saved and the short answers aren't counted (as in exam
+  practice today).
+
+**Which levels a quiz asks: the section's stage**
+
+Worked out from the section's quiz history each time, like the rest of the planner (numbers in `src/plan/rules.ts`):
+
+| Stage | When | Level 3 / 2 / 1 |
+| --- | --- | --- |
+| New | First week, or the last score was below 70% | 50% / 35% / 15% |
+| Learning | Otherwise | 25% / 50% / 25% |
+| Known | The last two quizzes were both 90% or more | 10% / 30% / 60% |
+| Exam soon | Within the exam pull (10 days) of an exam covering it | 50% / 35% / 15% |
+
+- Questions you got wrong last time still come first, within these shares.
+- **An anchor question:** a Known quiz always has at least one level-3 question. Easy questions alone could keep a
+  section "Known" when the student has forgotten how to do the problems; a missed anchor drops it back to Learning.
+- The planner counts each question's time by its level (table above), so a Known section's quiz of 3 (two level 1, the anchor) is
+  about 3 minutes, and a New one's of 10 about 13. The score table, gaps and sizes stay as they are.
+- When a level runs low in the bank, more of that level are asked for.
+
+**What the AI is asked for**
+
+- `questions` gains the guide and how many of each level (and form) to write; each question comes back with its
+  `level` (1-3) and `form` (`choice` or `short`; short ones with 1-3 `points` and no options). The stand-on-its-own
+  rule (#115) stays.
+- New jobs: `style` (the guide) and `grade-many` (a quiz's short answers in one request).
+- The helper's daily limit (200 requests a person) is plenty: a guide about once a week a class, and one marking
+  request per quiz with short answers.
+
+**Privacy:** materials and notes are the student's data like slides: encrypted on the device, sent only to our own
+helper as AI inputs, never stored there.
+
+**Building it, in order** (each its own issue and PR; the contract change first, announced in the task issues):
+
+1. Contract and storage: class materials and notes, the guide, `level` and `form` on questions (short ones with
+   points), short answers in attempts; sync for the new records and files.
+2. Helper: the `style` and `grade-many` jobs; levels, forms and the guide in `questions`.
+3. The class page's Exam style: materials, notes, the guide (read, edit, Remake).
+4. Bank, picking and planner: stages, level shares, anchors, time by level.
+5. The quiz screen: short answers, marking at the end, the multiple-choice-only fallback.
 
 ## The slide viewer
 
@@ -307,6 +408,8 @@ Tick a question once Matt and Nathan agree, and write the answer under it.
 - [ ] **Motivation:** the first design had a daily ring, streaks and combos. Keep those ideas for the checklist and Play (e.g. the ring fills as today's list gets done), or leave them for later with leaderboards?
 - [ ] **Default daily minutes:** 60? And should some classes get more of the time than others (e.g. a weight per class)?
     - For now (Nov 18, #47): 60, changed in Settings. No weights per class yet.
+- [ ] **Exam style and levels (#117):** are the level shares per stage, the times per level and the anchor rule right to start with? Should a level-3 question count for more than a level-1 one in the score (today every question counts the same)?
+- [ ] **Materials beyond PDF and text:** Word (.docx) course outlines are common. Read them on the device (a library) or ask for a PDF?
 - [ ] **Tuning numbers:** the 80% point for the quiz, about 3 questions per slide, the score table and the day 1/3/7 first week are guesses. Fine to start with and adjust after a few weeks of use?
 - [x] **Anthropic's terms:** confirm that running Claude Code headless on the server for your own studying, each on your own subscription, is within them, before the helper goes live.
     - Nathan checked (Nov 18): allowed for each person's own use, on their own subscription, with the official Claude Code CLI, as long as nobody else can run Claude on that login (Access and the helper make sure of that). Headless `claude -p` runs draw on the plan's separate monthly credit for programmatic use, not the normal chat limits.
@@ -316,7 +419,7 @@ Tick a question once Matt and Nathan agree, and write the answer under it.
 **Future ideas**
 
 - **Catch up:** a backlog for missed lectures, spread over the coming days as extra (cram) time.
-- **Practice tests:** upload past tests so the AI's questions match the real ones, or generate full practice exams.
+- **Practice tests:** generate full practice exams in the style of the past exams uploaded as class materials (#117 covers matching the questions to them).
 - **Leaderboards** (needs accounts and a server).
 - **Faithful PowerPoint viewing** (see The slide viewer), and other resources: notes, textbook chapters.
 - **Flashcards** as a side feature.
