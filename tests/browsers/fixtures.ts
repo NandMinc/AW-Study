@@ -22,10 +22,25 @@ export async function keepDrawing(context: BrowserContext, browserName: string):
   });
 }
 
-/** Every test's own context gets it; a test that makes another context calls keepDrawing itself. */
+/**
+ * A default answer for the AI helper's style job (#123): making questions first brings the class's exam style guide
+ * up to date (src/quiz/bank.ts guideForQuestions), so any test that makes questions asks for one. Like the helper,
+ * nothing is spent or sent. A test that checks style requests routes `**\/ai/style` on its page, which wins.
+ */
+export async function answerStyle(context: BrowserContext): Promise<void> {
+  await context.route('**/ai/style', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ tests: 'Test guide: what the exam asks.', levels: ['Recognise a term.', 'Apply it once.', 'Work a full problem.'], shortShare: 0 }),
+    }),
+  );
+}
+
+/** Every test's own context gets both; a test that makes another context calls them itself. */
 export const test = base.extend({
   context: async ({ context, browserName }, use) => {
     await keepDrawing(context, browserName);
+    await answerStyle(context);
     await use(context);
   },
 });

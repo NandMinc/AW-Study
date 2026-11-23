@@ -45,24 +45,48 @@ describe('planBank', () => {
   });
 
   it('asks a few pages at a time, never over 30 questions a request, adding up exactly', () => {
-    expect(planBank(slides(3), 0)).toEqual([{ pages: slides(3), count: 10 }]);
-    const plan = planBank(slides(12), 0);
+    expect(planBank(slides(3), [])).toEqual([{ pages: slides(3), count: 10, mix: { choice: [3, 3, 4], short: 0 } }]); // levels 1-3 in the bank's shares (#123)
+    const plan = planBank(slides(12), []);
     expect(plan.map((r) => r.pages.length)).toEqual([SLIDES_PER_REQUEST, SLIDES_PER_REQUEST, 2]);
     expect(plan.map((r) => r.count)).toEqual([15, 15, 6]);
     // Dense pages: 10 each, so only 3 pages fit in a request's 30
-    const heavy = planBank(dense(7, 1_500), 0);
+    const heavy = planBank(dense(7, 1_500), []);
     expect(heavy.map((r) => r.pages.length)).toEqual([3, 3, 1]);
     expect(heavy.map((r) => r.count)).toEqual([30, 30, 10]);
-    for (const p of [planBank(dense(40, 700), 0), planBank(dense(19, 500), 0), planBank(slides(40), 0)]) {
+    for (const p of [planBank(dense(40, 700), []), planBank(dense(19, 500), []), planBank(slides(40), [])]) {
       expect(p.every((r) => r.count <= 30 && r.pages.length <= SLIDES_PER_REQUEST)).toBe(true);
     }
-    expect(planBank(dense(19, 500), 0).reduce((n, r) => n + r.count, 0)).toBe(95);
+    expect(planBank(dense(19, 500), []).reduce((n, r) => n + r.count, 0)).toBe(95);
   });
 
-  it('only tops up what’s missing, and asks nothing for a full bank or no text', () => {
-    expect(planBank(slides(12), 30).map((r) => r.count)).toEqual([3, 2, 1]);
-    expect(planBank(slides(12), 36)).toEqual([]);
-    expect(planBank([], 0)).toEqual([]);
+  it('only tops up what’s missing, level by level, and asks nothing for a full bank or no text', () => {
+    // 12 short slides: a target of 36, held as 9 / 13 / 14 of levels 1-3
+    const bank = (l1: number, l2: number, l3: number) => [
+      ...Array.from({ length: l1 }, () => ({ form: 'choice' as const, level: 1 as const })),
+      ...Array.from({ length: l2 }, () => ({ form: 'choice' as const, level: 2 as const })),
+      ...Array.from({ length: l3 }, () => ({ form: 'choice' as const, level: 3 as const })),
+    ];
+    const topUp = planBank(slides(12), bank(9, 13, 8));
+    expect(topUp.reduce((n, r) => n + r.count, 0)).toBe(6);
+    expect(topUp.every((r) => r.mix.choice[0] === 0 && r.mix.choice[1] === 0 && r.mix.short === 0)).toBe(true); // only level 3
+    expect(planBank(slides(12), bank(9, 13, 14))).toEqual([]);
+    // An older bank, all level 2 (as read before #123): its level 1 and 3 are asked for, not more level 2
+    const old = planBank(slides(12), bank(0, 36, 0));
+    expect(old.reduce((n, r) => n + r.mix.choice[0], 0)).toBe(9);
+    expect(old.reduce((n, r) => n + r.mix.choice[2], 0)).toBe(14);
+    expect(old.every((r) => r.mix.choice[1] === 0)).toBe(true);
+    expect(planBank([], [])).toEqual([]);
+  });
+});
+
+describe('the levels in each request', () => {
+  it('every request’s mix adds up to its count, and the levels are dealt across the requests', () => {
+    for (const plan of [planBank(slides(12), []), planBank(slides(40), []), planBank(slides(3), [])]) {
+      for (const r of plan) expect(r.mix.choice.reduce((a, b) => a + b, 0) + r.mix.short).toBe(r.count);
+    }
+    const plan = planBank(slides(12), []); // 15, 15, 6 questions
+    expect(plan.every((r) => r.mix.choice.every((n) => n > 0))).toBe(true); // each request has all three levels
+    expect([0, 1, 2].map((l) => plan.reduce((n, r) => n + r.mix.choice[l]!, 0))).toEqual([9, 13, 14]);
   });
 });
 

@@ -9,7 +9,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { AiError } from '../ai/backend';
 import { signInUrl } from '../ai/http';
 import type { StudyStore } from '../db/store';
-import { fillBank, type BankProgress } from '../quiz/bank';
+import { fillBank, guideForQuestions, type BankProgress } from '../quiz/bank';
 import { useAi } from './ai-context';
 import { slidesLabel } from './classes';
 import { messageOf } from './useLoad';
@@ -137,7 +137,9 @@ export function BankJobsProvider({ store, children }: { store: StudyStore; child
       const section = (await store.listSections()).find((s) => s.id === job.sectionId);
       if (!section) throw new Error('That lecture was deleted.');
       const pageTexts = await store.getSlideDeckPages(section.deckId);
-      return fillBank({ ai, store, section, pageTexts, signal, onProgress });
+      // The class's guide brought up to date first (#123; sends nothing when it's current), then the questions follow it
+      const guide = await guideForQuestions(store, ai, section.courseId, signal);
+      return fillBank({ ai, store, section, pageTexts, guide, signal, onProgress });
     },
     () => redraw((n) => n + 1),
   );

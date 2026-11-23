@@ -5,7 +5,7 @@
 // doesn't reshuffle while you work, and what you finish stays on it, ticked, instead of disappearing.
 // A lecture is done when its quiz is done (Nathan, Nov 19): slide time alone never ticks anything.
 import { studyDay } from '../lib/studyDay';
-import { daysBetween, planDay, quizMinutes, type PlanInput, type PlanItem, type PracticeItem } from './planner';
+import { daysBetween, planDay, stageQuizMinutes, type PlanInput, type PlanItem, type PracticeItem } from './planner';
 import type { Exam } from '../types/lecture';
 import { RULES } from './rules';
 
@@ -109,7 +109,7 @@ export function progress(items: TaskItem[]): number {
   let done = 0;
   for (const t of items) {
     const study = t.item.kind === 'quiz' ? 0 : t.item.minutes;
-    const quiz = t.item.kind === 'extra' ? 0 : t.item.kind === 'quiz' ? t.item.minutes : quizMinutes(t.item.quizSize);
+    const quiz = t.item.kind === 'extra' ? 0 : t.item.kind === 'quiz' ? t.item.minutes : stageQuizMinutes(t.item.quizSize, t.item.stage);
     const weight = study + quiz;
     total += weight;
     done += t.done ? weight : Math.min(t.studiedMinutes, study) * RULES.slidesCountUpTo;

@@ -63,8 +63,9 @@ slides" and "M6: AI helper and quizzes":
 | AI questions stand on their own (no "this diagram"), with worked problems | #115 | Nathan's Claude | the question prompts and `refersToUnseen` in `helper/jobs.mjs`, `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (this PR). Live once `honed-ai` is updated; banks made before keep their old questions |
 | Design: exam style guide per class, question levels, short answers in quizzes | #117 | Nathan's Claude | `docs/DESIGN.md` ("Exam style and question levels", the Quizzes decision, two open questions) | **Done** (PR #119, Matt's OK); built in #120-#124. Scores weighted by level; "File types to support" list (Nathan, Nov 22) |
 | Exam style 1: contract and storage | #120 | Nathan's Claude | new `src/types/style.ts`; `Level`, `ChoiceQuestion`/`ShortQuestion`, `ShortAnswer`, the weighted score in `src/types/quiz.ts`; `src/db/quiz.ts` (forms, levels, short answers, weighted score); `pickQuiz` multiple choice only for now; then the materials and guide storage in `src/db/` and sync | Contract and quiz storage **done** (PR #126); materials and guide storage **this PR** (schema step 9, `src/db/style.ts`, sync incl. the sync server) |
-| Claiming tasks only with `tools/claim-task.mjs` | #133 | Nathan's Claude | `tools/claim-task.mjs`, `tests/claim-task.test.mjs`, "Taking a task" in `CLAUDE.md` | **This PR**, waiting for Matt's OK (shared workflow) |
-| Exam style 2: helper jobs (`style`, `grade-many`, levels and forms in `questions`) | #121 | Matt's Claude | `helper/jobs.mjs`, `tests/helper/`, `src/ai/` (backend, http, fake, check, new `style.ts`), the filter in `CompareModels.tsx` | **Done** (PR #127). **The helper changed: press Update for `honed-ai`** |
+| Claiming tasks only with `tools/claim-task.mjs` | #133 | Nathan's Claude | `tools/claim-task.mjs`, `tests/claim-task.test.mjs`, "Taking a task" in `CLAUDE.md` | **Done** (PR #134, Matt's OK) |
+| Exam style 2: helper | Exam style 4: bank, picking and planner by level | #123 | Nathan's Claude | new `src/quiz/levels.ts` (+ test), `RULES.levels`, `src/quiz/bank.ts`, `src/quiz/pick.ts`, the stage and timing in `src/plan/planner.ts` and `tasks.ts`, the stage in `PlayScreen`/`QuizScreen`, the guide before questions in `bank-jobs.tsx`/`QuizScreen`, `answerStyle` in `tests/browsers/fixtures.ts`, `tests/browsers/levels.spec.ts` | **Done** (this PR) |
+jobs (`style`, `grade-many`, levels and forms in `questions`) | #121 | Matt's Claude | `helper/jobs.mjs`, `tests/helper/`, `src/ai/` (backend, http, fake, check, new `style.ts`), the filter in `CompareModels.tsx` | **Done** (PR #127). **The helper changed: press Update for `honed-ai`** |
 | Exam style 3: the class page's Exam style (documents, notes, the guide) | #122 | Matt's Claude | new `src/ui/ExamStyleSection.tsx`, `src/quiz/guide.ts`, `readMaterialFile` in `src/ui/pdf-file.ts`, the `style` part in `route.ts` and `ClassMenu.tsx`, its place in `ClassScreen.tsx`, the exam style styles, `tests/browsers/exam-style.spec.ts` | **Done** (PR #130) |
 | After-class reminder: a popup when Honed opens links to the lecture to fill in | #129 | (free) | new `src/ui/AfterClass.tsx`, the reminder logic in `src/ui/classes.ts`, `src/App.tsx` | Not started. Matt's choice (Nov 22): ask when the app opens, not push |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
@@ -150,6 +151,15 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 22 (#123):** Quizzes by level. A section's stage (new: first week or last score under 70%; known: last two 90%+ and no
+  exam-style question missed in the last; exam: in an exam's run-up; learning otherwise) sets each quiz's levels
+  (`RULES.levels.stageShares`), a known quiz always has one exam-style question (the anchor), a level short of questions borrows from
+  the nearest, and the plan's quiz minutes are by level (20 s / 45 s / 2 min: a known quiz of 3 is 4 min, a new one of 10 is 13, a
+  15-question first quiz after the first week 21). Banks hold levels 1-3 as 25/35/40% and ask only for what each level lacks.
+  Making questions brings the guide up to date first and sends it; a failed guide never blocks questions. Browser tests get a
+  default `/ai/style` answer (`answerStyle` in fixtures.ts). Planner tests' minutes updated to the new times (one budget raised from
+  30 to 35 to keep its point). 11 deliberate breaks, all caught (two only after making them compile: a build that fails leaves the
+  old build in place, so a browser break must build).
 - **Nov 22 (#133):** Claims go through `tools/claim-task.mjs` (reads comments and assignees, refuses if held, assigns and posts,
   backs off on a simultaneous claim; `--check`, `--release`). Why: Nathan's Claude claimed #121 and #122 minutes after Matt's
   Claude without reading the comments, and built #122 a second time (#131). Nathan's PC also has a Claude Code hook that blocks
@@ -573,6 +583,7 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- Breaking code on purpose for a browser test: check the build still succeeds (`npm run build` type-checks), or the test runs the last good build and passes (#123).
 - Claim with `tools/claim-task.mjs`, not by hand: `gh issue list` doesn't show claim comments, so a task can look free when it isn't (#133).
 - A record's sync id must be its own: sync finds a record's latest change by `entityId` alone (not entity and id), so two kinds of
   record sharing an id overrule each other's changes (#120: the exam style is `style-<class id>`).

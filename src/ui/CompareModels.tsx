@@ -23,7 +23,7 @@ export function CompareModels({ setting, bank, onAdded, onClose }: { setting: Se
   const ai = useAi();
   const store = useStore();
   // The section's first few slides with text: the same for every model
-  const pages = planBank(sectionSlides(setting.section, setting.pageTexts), 0)[0]?.pages ?? [];
+  const pages = planBank(sectionSlides(setting.section, setting.pageTexts), [])[0]?.pages ?? [];
   const [results, setResults] = useState<Partial<Record<AiModel, Result>>>({});
   const [running, setRunning] = useState(false);
   const abort = useRef<AbortController | null>(null);
