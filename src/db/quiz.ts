@@ -3,7 +3,7 @@
 // once set up, refused while locked, writes inside `exclusive()`, every write in the change log.
 // Attempts are only ever added: deleting a lecture or class (lectures.ts) is the only way they go.
 import type { Exam, Section } from '../types/lecture';
-import type { OptionIndex, Question, QuestionInput, QuizAttempt, QuizStore, WrittenAnswer } from '../types/quiz';
+import type { ChoiceQuestion, Level, OptionIndex, Question, QuestionInput, QuizAttempt, QuizStore, ShortAnswer, ShortQuestion, WrittenAnswer } from '../types/quiz';
 import { writeRows, type StoreContext } from './lectures';
 import { StoreError } from './store';
 
@@ -18,6 +18,9 @@ export const POINTS_MAX = 6;
 export const POINT_MAX = 500;
 export const WRITTEN_ANSWER_MAX = 4_000;
 export const FEEDBACK_MAX = 400;
+export const SHORT_POINTS_MAX = 3;
+export const SHORT_TYPED_MAX = 1_000;
+const SHORT_MAX = 50;
 const DAY_MS = 86_400_000;
 
 const invalid = (message: string) => new StoreError('invalid', message);
@@ -27,6 +30,7 @@ export function questionKey(text: string): string {
   return text.toLowerCase().replace(/\s+/g, ' ').replace(/[\s?.!:]+$/, '').trim();
 }
 
+const isLevel = (v: unknown): v is Level => v === 1 || v === 2 || v === 3;
 const isOption = (v: unknown): v is OptionIndex => v === 0 || v === 1 || v === 2 || v === 3;
 const isIso = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) && !Number.isNaN(Date.parse(v));
 
@@ -38,20 +42,39 @@ function text(value: unknown, max: number, what: string, { empty = false } = {})
   return clean;
 }
 
+/** A question as stored before #120 had no form or level: it's multiple choice at level 2. */
+export function withDefaults(q: Question): Question {
+  const old = q as Question & { form?: string; level?: unknown };
+  if (old.form === 'short') return q;
+  return { ...q, form: 'choice', level: isLevel(old.level) ? old.level : 2 } as ChoiceQuestion;
+}
+
+type Made<Q> = Omit<Q, 'id' | 'courseId' | 'sectionId' | 'deckId' | 'createdAt'>;
+
 /** A question from the AI, checked and cleaned for this section (throws 'invalid' with a reason). */
-function checkQuestion(q: QuestionInput, section: Section, n: number): QuestionInput {
+function checkQuestion(q: QuestionInput, section: Section, n: number): Made<ChoiceQuestion> | Made<ShortQuestion> {
   const which = `Question ${n}`;
   if (typeof q !== 'object' || q === null) throw invalid(`${which} is missing.`);
   if (!Number.isInteger(q.page) || q.page < section.firstPage || q.page > section.lastPage) {
     throw invalid(`${which} names slide ${String(q.page)}, outside slides ${section.firstPage}–${section.lastPage}.`);
   }
   const question = text(q.question, QUESTION_MAX, `${which}’s text`);
+  const explanation = text(q.explanation ?? '', EXPLANATION_MAX, `${which}’s explanation`, { empty: true });
+  if (q.form === 'short') {
+    if (q.level !== undefined && q.level !== 3) throw invalid(`${which} is a short answer, so it must be level 3.`);
+    if (!Array.isArray(q.points) || q.points.length < 1 || q.points.length > SHORT_POINTS_MAX) {
+      throw invalid(`${which} needs 1 to ${SHORT_POINTS_MAX} points a full answer makes.`);
+    }
+    const points = q.points.map((p, i) => text(p, POINT_MAX, `${which}’s point ${i + 1}`));
+    return { form: 'short', level: 3, page: q.page, question, points, explanation };
+  }
+  if (q.form !== undefined && q.form !== 'choice') throw invalid(`${which} must be multiple choice or a short answer.`);
+  if (q.level !== undefined && !isLevel(q.level)) throw invalid(`${which}’s level must be 1, 2 or 3.`);
   if (!Array.isArray(q.options) || q.options.length !== 4) throw invalid(`${which} needs exactly four options.`);
-  const options = q.options.map((o, i) => text(o, OPTION_MAX, `${which}’s option ${i + 1}`)) as Question['options'];
+  const options = q.options.map((o, i) => text(o, OPTION_MAX, `${which}’s option ${i + 1}`)) as ChoiceQuestion['options'];
   if (new Set(options.map((o) => o.toLowerCase())).size !== 4) throw invalid(`${which}’s four options must all be different.`);
   if (!isOption(q.answer)) throw invalid(`${which}’s answer must be one of its four options.`);
-  const explanation = text(q.explanation ?? '', EXPLANATION_MAX, `${which}’s explanation`, { empty: true });
-  return { page: q.page, question, options, answer: q.answer, explanation };
+  return { form: 'choice', level: q.level ?? 2, page: q.page, question, options, answer: q.answer, explanation };
 }
 
 /** A short answer from exam practice, checked and cleaned for this section (throws 'invalid' with a reason). */
@@ -85,7 +108,8 @@ export function quizMethods(ctx: StoreContext): QuizStore {
     return open<Section>('sections', row);
   };
 
-  const bank = async (sectionId: string) => openAll<Question>('questions', await db.getAllFromIndex('questions', 'bySection', sectionId));
+  const bank = async (sectionId: string) =>
+    (await openAll<Question>('questions', await db.getAllFromIndex('questions', 'bySection', sectionId))).map(withDefaults);
   const oldestFirst = (a: Question, b: Question) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 
   return {
@@ -113,7 +137,7 @@ export function quizMethods(ctx: StoreContext): QuizStore {
           if (seen.has(key)) throw invalid(`Question ${i + 1} is already in this section’s bank.`);
           seen.add(key);
           const createdAt = new Date(start + i).toISOString();
-          return { id: ctx.newId(), courseId: section.courseId, sectionId, deckId: section.deckId, ...q, createdAt };
+          return { id: ctx.newId(), courseId: section.courseId, sectionId, deckId: section.deckId, ...q, createdAt } as Question;
         });
         const [rows, logs] = await Promise.all([
           Promise.all(made.map((q) => seal('questions', { ...q }))),
@@ -139,8 +163,11 @@ export function quizMethods(ctx: StoreContext): QuizStore {
         }
         if (!Array.isArray(input.answers)) throw invalid('The quiz’s answers are missing.');
         if (input.written !== undefined && !Array.isArray(input.written)) throw invalid('The quiz’s short answers aren’t valid.');
+        if (input.short !== undefined && !Array.isArray(input.short)) throw invalid('The quiz’s short answers aren’t valid.');
         const writtenIn = input.written ?? [];
-        if (input.answers.length + writtenIn.length === 0) throw invalid('A quiz needs at least one answer.');
+        const shortIn = input.short ?? [];
+        if (input.answers.length + writtenIn.length + shortIn.length === 0) throw invalid('A quiz needs at least one answer.');
+        if (shortIn.length > SHORT_MAX) throw invalid(`A quiz can have at most ${SHORT_MAX} short answers.`);
         if (input.answers.length > ANSWERS_MAX) throw invalid(`A quiz can have at most ${ANSWERS_MAX} answers.`);
         if (writtenIn.length > WRITTEN_MAX) throw invalid(`A quiz can have at most ${WRITTEN_MAX} short answers.`);
         if (input.examId !== undefined) {
@@ -156,15 +183,37 @@ export function quizMethods(ctx: StoreContext): QuizStore {
           if (!q) throw invalid(`Answer ${i + 1} is to a question that isn’t in this section’s bank.`);
           if (seenIds.has(q.id)) throw invalid('A question can only be answered once in a quiz.');
           seenIds.add(q.id);
+          if (q.form !== 'choice') throw invalid(`Answer ${i + 1} is to a short-answer question, so it needs a typed answer.`);
           if (!isOption(a.chosen)) throw invalid(`Answer ${i + 1} must be one of the four options.`);
           const ms = Number.isFinite(a.ms) && a.ms >= 0 ? Math.min(Math.round(a.ms), DAY_MS) : 0;
           // The store marks it: the score comes from the stored answer, never from the screen
-          return { questionId: q.id, chosen: a.chosen, right: a.chosen === q.answer, ms };
+          return { questionId: q.id, chosen: a.chosen, right: a.chosen === q.answer, ms, level: q.level };
         });
-        // A short answer is one question worth its share of the points
-        const marks = written.reduce((sum, w) => sum + w.mark / w.points.length, 0);
-        const right = Math.round((answers.filter((a) => a.right).length + marks) * 100) / 100;
-        const asked = answers.length + written.length;
+        const short: ShortAnswer[] = shortIn.map((s, i) => {
+          const which = `Short answer ${i + 1}`;
+          const q = questions.get(s?.questionId);
+          if (!q || q.form !== 'short') throw invalid(`${which} is to a question that isn’t one of this section’s short-answer questions.`);
+          if (seenIds.has(q.id)) throw invalid('A question can only be answered once in a quiz.');
+          seenIds.add(q.id);
+          const outOf = q.points.length;
+          if (!Number.isInteger(s.mark) || s.mark < 0 || s.mark > outOf) throw invalid(`${which}’s mark must be a whole number from 0 to ${outOf}.`);
+          const typed = text(s.typed, SHORT_TYPED_MAX, `${which}’s answer`, { empty: true });
+          const feedback = text(s.feedback ?? '', FEEDBACK_MAX, `${which}’s feedback`, { empty: true });
+          const ms = Number.isFinite(s.ms) && s.ms >= 0 ? Math.min(Math.round(s.ms), DAY_MS) : 0;
+          return { questionId: q.id, typed, mark: s.mark, outOf, feedback, ms, level: 3 };
+        });
+        // Each answer counts as one question: right or wrong, or a short or written answer's share of its points.
+        // `right` isn't weighted ("7 of 10 right"); the score is weighted by level (DESIGN "Exam style and
+        // question levels"), and exam practice's written answers count as level 3.
+        const parts: { level: Level; got: number }[] = [
+          ...answers.map((a) => ({ level: a.level, got: a.right ? 1 : 0 })),
+          ...short.map((s) => ({ level: s.level, got: s.mark / s.outOf })),
+          ...written.map((w) => ({ level: 3 as const, got: w.mark / w.points.length })),
+        ];
+        const right = Math.round(parts.reduce((sum, p) => sum + p.got, 0) * 100) / 100;
+        const asked = parts.length;
+        const weight = parts.reduce((sum, p) => sum + p.level, 0);
+        const score = parts.reduce((sum, p) => sum + p.level * p.got, 0) / weight;
         const attempt: QuizAttempt = {
           id: ctx.newId(),
           courseId: section.courseId,
@@ -174,9 +223,10 @@ export function quizMethods(ctx: StoreContext): QuizStore {
           answers,
           ...(input.examId !== undefined && { examId: input.examId }),
           ...(input.written !== undefined && { written }),
+          ...(short.length > 0 && { short }),
           right,
           asked,
-          score: right / asked,
+          score,
           createdAt: iso(),
         };
         const [row, log] = await Promise.all([seal('quizAttempts', { ...attempt }), change('quizAttempt', 'put', attempt.id, attempt)]);

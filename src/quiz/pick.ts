@@ -1,13 +1,13 @@
 // Which questions a quiz asks (DESIGN, "Questions"): the ones you got wrong last time first, then
 // ones never asked, then the rest, longest-ago first, so recently asked questions wait their turn.
 // Each question's options are shown in a fresh order, so the right one isn't always in one place.
-import type { OptionIndex, Question, QuizAttempt } from '../types/quiz';
+import { isChoice, type ChoiceQuestion, type OptionIndex, type Question, type QuizAttempt } from '../types/quiz';
 
 /** Questions in a quiz started by hand from a class (in Play, the planner sets the size). Nov 19: 10, was 5. */
 export const QUIZ_SIZE = 10;
 
 export interface QuizItem {
-  question: Question;
+  question: ChoiceQuestion; // multiple choice only until short answers reach the quiz screen (#124)
   /** order[shown position] = the option's index as stored. */
   order: OptionIndex[];
 }
@@ -32,10 +32,10 @@ export function pickQuiz(questions: Question[], attempts: QuizAttempt[], size = 
       if (!last.has(answer.questionId)) last.set(answer.questionId, { right: answer.right, at: attempt.finishedAt });
     }
   }
-  const wrong: Question[] = [];
-  const fresh: Question[] = [];
-  const known: Question[] = [];
-  for (const q of questions) {
+  const wrong: ChoiceQuestion[] = [];
+  const fresh: ChoiceQuestion[] = [];
+  const known: ChoiceQuestion[] = [];
+  for (const q of questions.filter(isChoice)) {
     const seen = last.get(q.id);
     if (!seen) fresh.push(q);
     else if (!seen.right) wrong.push(q);
