@@ -5,6 +5,7 @@
 // viewer (PDF.js).
 import { useEffect, useRef, useState } from 'react';
 import type { StudyStore } from '../db/store';
+import { sectionStage, type Stage } from '../quiz/levels';
 import { pickQuiz, QUIZ_SIZE, type QuizItem } from '../quiz/pick';
 import type { PlanItem } from '../plan/planner';
 import type { Question, QuizAttempt } from '../types/quiz';
@@ -98,7 +99,7 @@ function PlayItem({
   if (phase === 'study') {
     return <StudyTime item={item} place={place} store={store} onEnd={() => (item.kind === 'extra' ? onDone() : setPhase('quiz'))} />;
   }
-  return <PlayQuiz place={place} size={'quizSize' in item ? item.quizSize : QUIZ_SIZE} onDone={onDone} last={last} />;
+  return <PlayQuiz place={place} size={'quizSize' in item ? item.quizSize : QUIZ_SIZE} stage={'stage' in item ? item.stage : undefined} onDone={onDone} last={last} />;
 }
 
 function StudyTime({ item, place, store, onEnd }: { item: PlanItem; place: ItemPlace; store: StudyStore; onEnd: () => void }) {
@@ -171,7 +172,8 @@ function StudyTime({ item, place, store, onEnd }: { item: PlanItem; place: ItemP
   );
 }
 
-function PlayQuiz({ place, size, onDone, last }: { place: ItemPlace; size: number; onDone: () => void; last: boolean }) {
+/** `stage` (#123): the planner's, so the quiz asks that stage's levels; without one, worked out from the section's quizzes. */
+function PlayQuiz({ place, size, stage, onDone, last }: { place: ItemPlace; size: number; stage?: Stage; onDone: () => void; last: boolean }) {
   const store = useStore();
   const { data, error, reload } = useLoad(async () => {
     const [pageTexts, questions, attempts] = await Promise.all([
@@ -182,7 +184,8 @@ function PlayQuiz({ place, size, onDone, last }: { place: ItemPlace; size: numbe
     return { setting: { course: place.course, section: place.section, deck: place.deck, pageTexts } satisfies Setting, questions, attempts };
   }, [store, place.section.id]);
   const [quiz, setQuiz] = useState<{ items: QuizItem[]; startedAt: string } | null>(null);
-  const begin = (questions: Question[], attempts: QuizAttempt[]) => setQuiz({ items: pickQuiz(questions, attempts, size), startedAt: new Date().toISOString() });
+  const begin = (questions: Question[], attempts: QuizAttempt[]) =>
+    setQuiz({ items: pickQuiz(questions, attempts, size, Math.random, stage ?? sectionStage(attempts)), startedAt: new Date().toISOString() });
 
   // Straight into the quiz when the bank has questions
   useEffect(() => {

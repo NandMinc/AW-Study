@@ -8,12 +8,14 @@ import { studyDay } from '../lib/studyDay';
 import type { Exam, Lecture, Section } from '../types/lecture';
 import type { StudySession } from '../types/plan';
 import type { QuizAttempt } from '../types/quiz';
+import { quizSeconds, sectionStage, type Stage } from '../quiz/levels';
 import { RULES } from './rules';
 
+/** `stage` (#123): which levels the item's quiz asks (src/quiz/levels.ts); its quiz time is counted by them. */
 export type PlanItem =
-  | { kind: 'study'; sectionId: string; step: 1 | 2 | 3; minutes: number; quizSize: number; due: string; overdueDays: number }
+  | { kind: 'study'; sectionId: string; step: 1 | 2 | 3; minutes: number; quizSize: number; stage: Stage; due: string; overdueDays: number }
   /** `examId`: pulled forward for that exam (#86), not the section's own schedule. */
-  | { kind: 'quiz'; sectionId: string; minutes: number; quizSize: number; due: string; overdueDays: number; examId?: string }
+  | { kind: 'quiz'; sectionId: string; minutes: number; quizSize: number; stage: Stage; due: string; overdueDays: number; examId?: string }
   | { kind: 'extra'; sectionId: string; minutes: number; due: string; overdueDays: number };
 
 /**
@@ -69,9 +71,14 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
 }
 
-/** Minutes a quiz of `n` questions takes, at RULES.secondsPerQuestion each, rounded up. */
+/** Minutes a quiz of `n` questions takes, at RULES.secondsPerQuestion each, rounded up (exam practice's multiple choice). */
 export function quizMinutes(n: number): number {
   return Math.ceil((n * RULES.secondsPerQuestion) / 60);
+}
+
+/** Minutes a section's quiz of `n` questions takes in `stage`, by its levels (#123), rounded up. */
+export function stageQuizMinutes(n: number, stage: Stage): number {
+  return Math.ceil(quizSeconds(n, stage) / 60);
 }
 
 /** Questions in a first-week quiz for this section: by its number of slides (RULES.firstWeekQuiz). */
@@ -127,7 +134,7 @@ export function sectionItems(input: PlanInput, section: Section, lecture: Lectur
     const afterPrevious = i > 0 ? addDays(doneOn[i - 1]!, offsets[i]! - offsets[i - 1]!) : earliest;
     const date = earliest > afterPrevious ? earliest : afterPrevious;
     if (date <= input.today) {
-      items.push({ kind: 'study', sectionId: section.id, step: (i + 1) as 1 | 2 | 3, minutes: minutes[i]!, quizSize: firstWeekQuizSize(section), ...due(date) });
+      items.push({ kind: 'study', sectionId: section.id, step: (i + 1) as 1 | 2 | 3, minutes: minutes[i]!, quizSize: firstWeekQuizSize(section), stage: 'new', ...due(date) });
     }
     break; // one step at a time
   }
@@ -145,7 +152,8 @@ export function sectionItems(input: PlanInput, section: Section, lecture: Lectur
       size = after.size;
       next = addDays(on, gap);
     }
-    if (next <= input.today) items.push({ kind: 'quiz', sectionId: section.id, minutes: quizMinutes(size), quizSize: size, ...due(next) });
+    const stage = sectionStage(attempts);
+    if (next <= input.today) items.push({ kind: 'quiz', sectionId: section.id, minutes: stageQuizMinutes(size, stage), quizSize: size, stage, ...due(next) });
   }
 
   // Extra study after a low score, the day after it, until done (a newer low score asks again)
@@ -260,7 +268,14 @@ export function planDay(input: PlanInput): Plan {
       const quizDays = input.attempts.filter((a) => a.sectionId === section.id).map((a) => day(a.finishedAt));
       const due = examQuizDue(exam, lecture, quizDays);
       if (due && due <= input.today) {
-        items.push({ kind: 'quiz', sectionId: section.id, minutes: quizMinutes(quizSize), quizSize, due, overdueDays: daysBetween(due, input.today), examId: exam.id });
+        items.push({ kind: 'quiz', sectionId: section.id, minutes: quizMinutes(quizSize), quizSize, stage: 'exam', due, overdueDays: daysBetween(due, input.today), examId: exam.id });
+      }
+    }
+    // In an exam's run-up its sections are quizzed the exam's way (#123): mostly exam-style, timed so
+    if (exam) {
+      for (const [i, item] of items.entries()) {
+        if (item.kind === 'quiz') items[i] = { ...item, stage: 'exam', minutes: stageQuizMinutes(item.quizSize, 'exam') };
+        else if (item.kind === 'study') items[i] = { ...item, stage: 'exam' };
       }
     }
     for (const item of items) candidates.push({ item, lastScore, lectureDate: lecture.date, exam });
