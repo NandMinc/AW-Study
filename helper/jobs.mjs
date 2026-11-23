@@ -133,6 +133,41 @@ function replyText(value, name, max) {
   return value.trim().slice(0, max);
 }
 
+// --- Questions that stand on their own (#115) ---
+
+// Shared by both question jobs. The student sees only the question, never the slide (and Claude
+// only ever gets a slide's text, not its pictures), so a question must make sense to an expert
+// who has never seen these slides.
+const STANDALONE = [
+  'The student sees only the question and its options, never the slides, so every question must stand on its own: an expert on the subject who has never seen these slides must be able to answer it perfectly.',
+  'So never refer to the slides, the lecture, the course or the teacher, and never to a diagram, figure, image, chart or example that isn\'t written out in the question ("in this diagram", "as shown", "according to the slide" are all wrong). You only have each slide\'s text, not its pictures, so don\'t ask about what a picture might show. Put any numbers, definitions or set-up a question needs into the question itself.',
+  'Ask about the subject, not about how these slides happen to word or arrange it.',
+  'Where the material can be worked through (calculations, equations, derivations, code, problems with a method), include worked problems that apply the method to concrete values written in the question, such as "Solve ..." or "Calculate ...". Use them where they test understanding better than recall would; not every question needs to be one.',
+].join('\n');
+
+// Phrases that give away a question pointing at material the student can't see. Kept narrow, so
+// "the periodic table" or "a Venn diagram" stay fine. A question caught here is dropped.
+const UNSEEN = [
+  /\b(?:this|these|that|those|the|following|above|below|previous|next)\s+(?:slides?|lectures?|diagrams?|figures?|charts?|illustrations?|screenshots?)\b/i,
+  // Not "the image": "the image of 2 under f" is maths
+  /\b(?:this|these|that|those|following|above|below|previous|next)\s+(?:images?|pictures?)\b/i,
+  /\b(?:on|in|from|according to)\s+(?:the\s+)?(?:slides?|lecture)\b/i,
+  /\bshown\s+(?:above|below|here|in)\b/i,
+  /\bslide\s+\d+/i,
+];
+
+/** Whether any of these texts points at something the student can't see. */
+export function refersToUnseen(...texts) {
+  return texts.some((t) => UNSEEN.some((re) => re.test(t)));
+}
+
+/** Drops questions that point at unseen material, before trimming to the count; none left is a bad reply (retried). */
+function keepStandalone(questions, textsOf) {
+  const kept = questions.filter((q) => typeof q !== 'object' || q === null || !refersToUnseen(...textsOf(q).filter((t) => typeof t === 'string')));
+  if (kept.length === 0) bad('Every question referred to the slides.');
+  return kept;
+}
+
 // --- The jobs ---
 
 export const JOBS = {
@@ -152,8 +187,9 @@ export const JOBS = {
       return buildPrompt(
         [
           `Write ${input.count} multiple-choice questions that test understanding of the slides in DATA.pages (each has a slide number "page" and its "text").`,
-          'Each question has exactly 4 different options and exactly one right answer. Wrong options must be plausible. Ask about the ideas, not about the wording of the slides.',
-          'Each question comes from one slide: give that slide\'s number as "page". Spread the questions over the slides that have something to learn, giving more to slides with more to learn. Never ask about slides that only organise the lecture: title, agenda or contents, section dividers, "thank you", "questions?", references or credits; put those questions on the other slides instead.',
+          STANDALONE,
+          'Each question has exactly 4 different options and exactly one right answer. Wrong options must be plausible; for a worked problem, make them the answers common mistakes give.',
+          'Each question is based on one slide: give that slide\'s number as "page" (the app uses it to show where to revise). Spread the questions over the slides that have something to learn, giving more to slides with more to learn. Never ask about slides that only organise the lecture: title, agenda or contents, section dividers, "thank you", "questions?", references or credits; put those questions on the other slides instead.',
           'Don\'t repeat or closely rephrase any question in DATA.avoid.',
           'Reply with: {"questions": [{"question": string, "options": [4 strings], "answer": index of the right option (0-3), "page": slide number, "explanation": one sentence on why it\'s right}]}',
         ].join('\n'),
@@ -164,7 +200,8 @@ export const JOBS = {
       const reply = replyObject(text);
       if (!Array.isArray(reply.questions) || reply.questions.length === 0) bad('No questions.');
       const valid = new Set(input.pages.map((p) => p.page));
-      const questions = reply.questions.slice(0, input.count).map((q, i) => {
+      const standalone = keepStandalone(reply.questions, (q) => [q.question, ...(Array.isArray(q.options) ? q.options : [])]);
+      const questions = standalone.slice(0, input.count).map((q, i) => {
         if (typeof q !== 'object' || q === null) bad(`Question ${i + 1} isn’t an object.`);
         const question = replyText(q.question, `Question ${i + 1}`, 600);
         if (!Array.isArray(q.options) || q.options.length !== 4) bad(`Question ${i + 1} needs exactly 4 options.`);
@@ -192,8 +229,9 @@ export const JOBS = {
       return buildPrompt(
         [
           `Write ${input.count} short-answer exam questions on the slides in DATA.pages (each has a slide number "page" and its "text"). Each should take a student 2 to 4 sentences to answer.`,
+          STANDALONE,
           `For each, list 2 to ${LIMITS.writtenPoints} points a full answer makes, short and checkable; a marker gives one mark per point.`,
-          'Each question comes from one slide: give that slide\'s number as "page". Choose the slides with the most important ideas. Never ask about slides that only organise the lecture: title, agenda or contents, section dividers, "thank you", "questions?", references or credits.',
+          'Each question is based on one slide: give that slide\'s number as "page". Choose the slides with the most important ideas. Never ask about slides that only organise the lecture: title, agenda or contents, section dividers, "thank you", "questions?", references or credits.',
           'Reply with: {"questions": [{"question": string, "points": [strings], "page": slide number}]}',
         ].join('\n'),
         input,
@@ -203,7 +241,8 @@ export const JOBS = {
       const reply = replyObject(text);
       if (!Array.isArray(reply.questions) || reply.questions.length === 0) bad('No questions.');
       const valid = new Set(input.pages.map((p) => p.page));
-      const questions = reply.questions.slice(0, input.count).map((q, i) => {
+      const standalone = keepStandalone(reply.questions, (q) => [q.question]);
+      const questions = standalone.slice(0, input.count).map((q, i) => {
         if (typeof q !== 'object' || q === null) bad(`Question ${i + 1} isn’t an object.`);
         const question = replyText(q.question, `Question ${i + 1}`, 600);
         if (!Array.isArray(q.points) || q.points.length < 1 || q.points.length > LIMITS.writtenPoints) bad(`Question ${i + 1} needs 1 to ${LIMITS.writtenPoints} points.`);

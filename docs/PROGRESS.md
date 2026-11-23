@@ -60,6 +60,7 @@ slides" and "M6: AI helper and quizzes":
 | Sync step 3: slide PDFs on demand | #108 | Nathan's Claude | `sync/` (schema step 4, `/api/files/`), `getSlideDeckFile`/`Pages` in `src/db/lectures.ts`, `src/db/sync.ts`, `src/sync/engine.ts`, `SyncRunner.tsx`, tests | **Done** (PR #109) |
 | Phone slide page: just the slides | #110 | Nathan's Claude | `src/App.tsx`, `src/ui/SlidesScreen.tsx`, `src/viewer/SlideViewer.tsx`, `src/app.css`, `src/viewer/viewer.css`, tests | **Done** (this PR) |
 | CI: tests side by side, no second run on main, images built alongside | #112 | Nathan's Claude | `.github/workflows/publish.yml`, its line in `CLAUDE.md` | **Done** (this PR) |
+| AI questions stand on their own (no "this diagram"), with worked problems | #115 | Nathan's Claude | the question prompts and `refersToUnseen` in `helper/jobs.mjs`, `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (this PR). Live once `honed-ai` is updated; banks made before keep their old questions |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -84,6 +85,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Decisions (newest first)
 
+- **Nov 22: Questions stand on their own** (Nathan, #115): an expert on the subject who has never seen the slides must be able
+  to score perfectly. Questions never refer to the slides, the lecture or a picture (the AI only gets slide text, never
+  the pictures), and include worked problems ("Solve ...", wrong options = common mistakes) where the material allows.
 - **Nov 19: The look** (Matt and Nathan): `docs/design/` is the reference for how the app looks and behaves.
   Dark grey `#272727`, white `#f2f5f1`, green `#9fe870`, plus a light mode; three main pages (Tasks,
   Classes, Settings) behind a nav bar; Tasks grouped by class in a saved order; no times shown. First-week
@@ -137,6 +141,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 22 (#115):** Both question prompts (`questions`, `written`) gain the stand-on-its-own rule and worked problems. The helper
+  drops any question (or option) that still points at unseen material ("this diagram", "according to the slide", "slide 4",
+  "shown above"; narrow, so "the periodic table" and "the image of 2 under f" pass) before trimming to the count, and retries
+  only when none are left. Each check proven to fail without its rule.
 - **Nov 22 (#87, part 3):** Exam practice's contract (contract change, agreed in #87). `QuizAttempt` gains
   `examId` and `written` (`WrittenAnswer`: the AI's question, its 1-6 points, the slide, what was typed, the
   mark, the feedback), both optional, so older attempts read unchanged and sync carries them as before. A
