@@ -63,6 +63,7 @@ slides" and "M6: AI helper and quizzes":
 | AI questions stand on their own (no "this diagram"), with worked problems | #115 | Nathan's Claude | the question prompts and `refersToUnseen` in `helper/jobs.mjs`, `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (this PR). Live once `honed-ai` is updated; banks made before keep their old questions |
 | Design: exam style guide per class, question levels, short answers in quizzes | #117 | Nathan's Claude | `docs/DESIGN.md` ("Exam style and question levels", the Quizzes decision, two open questions) | **Done** (PR #119, Matt's OK); built in #120-#124. Scores weighted by level; "File types to support" list (Nathan, Nov 22) |
 | Exam style 1: contract and storage | #120 | Nathan's Claude | new `src/types/style.ts`; `Level`, `ChoiceQuestion`/`ShortQuestion`, `ShortAnswer`, the weighted score in `src/types/quiz.ts`; `src/db/quiz.ts` (forms, levels, short answers, weighted score); `pickQuiz` multiple choice only for now; then the materials and guide storage in `src/db/` and sync | Contract and quiz storage **done** (PR #126); materials and guide storage **this PR** (schema step 9, `src/db/style.ts`, sync incl. the sync server) |
+| Claiming tasks only with `tools/claim-task.mjs` | #133 | Nathan's Claude | `tools/claim-task.mjs`, `tests/claim-task.test.mjs`, "Taking a task" in `CLAUDE.md` | **This PR**, waiting for Matt's OK (shared workflow) |
 | Exam style 2: helper jobs (`style`, `grade-many`, levels and forms in `questions`) | #121 | Matt's Claude | `helper/jobs.mjs`, `tests/helper/`, `src/ai/` (backend, http, fake, check, new `style.ts`), the filter in `CompareModels.tsx` | **Done** (PR #127). **The helper changed: press Update for `honed-ai`** |
 | Exam style 3: the class page's Exam style (documents, notes, the guide) | #122 | Matt's Claude | new `src/ui/ExamStyleSection.tsx`, `src/quiz/guide.ts`, `readMaterialFile` in `src/ui/pdf-file.ts`, the `style` part in `route.ts` and `ClassMenu.tsx`, its place in `ClassScreen.tsx`, the exam style styles, `tests/browsers/exam-style.spec.ts` | **Done** (PR #130) |
 | After-class reminder: a popup when Honed opens links to the lecture to fill in | #129 | Matt's Claude | new `src/ui/AfterClass.tsx` and `src/ui/after-class.ts` (+ tests), its place in `src/App.tsx`, `tests/browsers/after-class.spec.ts` | **Done** (PR #132). Try on a real phone after deploy |
@@ -156,6 +157,10 @@ the "Test and publish" run on `main` to finish, then press Update.
   date buttons, and popping them up at once would greet every new class with its past week. WebKit caught Escape
   being lost (see Gotchas). 15 deliberate breaks, all caught.
 
+- **Nov 22 (#133):** Claims go through `tools/claim-task.mjs` (reads comments and assignees, refuses if held, assigns and posts,
+  backs off on a simultaneous claim; `--check`, `--release`). Why: Nathan's Claude claimed #121 and #122 minutes after Matt's
+  Claude without reading the comments, and built #122 a second time (#131). Nathan's PC also has a Claude Code hook that blocks
+  posting "taking this" by hand. 6 deliberate breaks, all caught.
 - **Nov 22 (#122):** A class's **Exam style** on its page (and in the Classes page's menu): documents (PDF or text,
   each a past exam, outline, practice set or other), notes about the exam, and the guide (read, edit, Remake).
   The guide is made only when the student acts (Write the guide, Remake, or changing the documents or notes
@@ -579,6 +584,7 @@ the "Test and publish" run on `main` to finish, then press Update.
   browser paints, so a test (or a quick person) can see the popup and press Escape before the listener exists.
   WebKit lost it 5 runs in 8. The listener is added once while the popup is open, reading the current handler
   through a ref (as for keyboard shortcuts below).
+- Claim with `tools/claim-task.mjs`, not by hand: `gh issue list` doesn't show claim comments, so a task can look free when it isn't (#133).
 - A record's sync id must be its own: sync finds a record's latest change by `entityId` alone (not entity and id), so two kinds of
   record sharing an id overrule each other's changes (#120: the exam style is `style-<class id>`).
 

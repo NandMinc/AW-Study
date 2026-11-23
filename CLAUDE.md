@@ -19,7 +19,12 @@ other**. GitHub is the shared channel. Each human relays only when something nee
 **Taking a task:**
 - Work only on a task that has an issue labelled `agent-task`. No issue yet? Make one first
   (what, which files, done when).
-- Claim it with a comment: `[Matt's Claude] taking this` or `[Nathan's Claude] taking this`.
+- **Claim it only with `node tools/claim-task.mjs <issue> "what you'll do"`**, never by writing "taking
+  this" yourself (#133: twice on Nov 22 a task was claimed minutes after the other Claude had it, and once
+  built twice). The script reads the comments and assignees and refuses if the other Claude holds it,
+  assigns it to you and posts the claim, then backs off if you both claimed at once (the earlier claim
+  wins). If it refuses, pick another task or ask on the issue. `--check <issue>` shows who holds one;
+  `--release <issue> "why"` lets yours go. `gh issue list --label agent-task` shows who has each.
 - Branch, and open a **draft PR** at once with `Closes #<issue>`, so `gh pr list` shows the
   work is in progress.
 - Only edit the files your task owns (its row in `docs/PROGRESS.md`). Need a change elsewhere,
