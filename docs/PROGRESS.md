@@ -49,7 +49,7 @@ slides" and "M6: AI helper and quizzes":
 | Restyle step 4: Settings on one page (AI sign-in check, Compare models) | #79 | Matt's Claude | `src/ui/AiSettings.tsx`, `status()` in `src/ai/` (backend, http, fake, tests), one line of `SettingsScreen.tsx`, the quiz route's `/compare` and its prop in `QuizScreen.tsx`, `tests/browsers/settings.spec.ts` | **Done** (PR #80). Daily minutes came to Settings with #78 |
 | Restyle step 5: the other screens to match (setup, unlock, a class's page, What was covered?, the viewer, quizzes, Play) | #82 | Matt's Claude | the step 5 block at the end of `src/app.css`, `className="back"` on the back links | **Done** (PR #83). The restyle is finished |
 | Milestone 9a: exams pull their sections forward (planner) | #86 | Matt's Claude | the exam rules in `src/plan/planner.ts` (+ `RULES.examPullDays`, `examQuizzes`), `PlanInput.exams`, `Plan.examsOver` (through `tasks.ts`), loading exams in `planning.ts`, the note on `TasksScreen.tsx` | **Done** (PR #88) |
-| Milestone 9b: exam practice with AI-graded short answers | #87 | Matt's Claude | the contract: `WrittenAnswer`, `examId` and `written` in `src/types/quiz.ts`, `recordQuizAttempt` in `src/db/quiz.ts`, `describeScore` in `src/quiz/pick.ts`; then `practiceFor`/`PracticeItem`/`Plan.practice` in `src/plan/planner.ts`, `RULES.examPractice*`; then the screen | Helper job (PR #89), contract (PR #114) and the planner's practice (PR #118) **done**; the screen next |
+| Milestone 9b: exam practice with AI-graded short answers | #87 | Matt's Claude | the contract (`WrittenAnswer`, `examId`, `written`), `recordQuizAttempt`, `describeScore`; `practiceFor` and `Plan.practice` in the planner; `src/quiz/practice.ts`, `src/ui/PracticeScreen.tsx`, the practice route, `TasksDay.practice` in `src/plan/tasks.ts`, the practice row in `TasksScreen.tsx`, `tests/browsers/practice.spec.ts` | **Done** (helper PR #89, contract PR #114, planner PR #118, screen PR #125). Try on a real phone after deploy |
 | Viewer: fit width for portrait pages (documents saved as PDF) | #46 | Nathan's Claude | `src/viewer/SlideViewer.tsx`, `viewer.css`, new `fit.ts` + `fit.test.ts`, the page size in `test-pdf.ts`, `tests/browsers/viewer.spec.ts` | **Done** (this PR). Try on a real phone after deploy |
 | Accounts and sync (v2), testing phase on the home server: **design first** | #93 | Nathan's Claude | `docs/SECURITY.md` ("Accounts and sync"), the accounts lines in `docs/DESIGN.md` | **Done** (design merged; built in #95, #105, #108) |
 | Sync step 1: the `honed-sync` server's Google sign-in and accounts, Settings' Account box | #95 | Nathan's Claude | `sync/`, `tests/sync/`, the `sync-image` CI job, `/api/` in `vite.config.ts` and `app.spec.ts`, `src/sync/`, one line of `SettingsScreen.tsx`, `tests/browsers/account.spec.ts` | **Done** (this PR). Live once Nathan sets up the server side (Google client, dataset, app, tunnel route) |
@@ -77,7 +77,7 @@ slides" and "M6: AI helper and quizzes":
 | 6 | AI helper and quizzes | **Helper live** (#27); question banks and quizzes **done** (#40); scores moving the schedule waits for 5 |
 | 7 | Viewer tools: highlights, notes, explain, ask | **Done** (#56); not yet tried on a real phone |
 | 8 | First run (tutorial) and after-class prompts | Not started |
-| 9 | Exams: pulling forward, practice tests with AI-graded short answers | **Pulling forward done** (#86); exam practice: helper, contract and planner done, the screen next (#87) |
+| 9 | Exams: pulling forward, practice tests with AI-graded short answers | **Done** (#86, #87); not yet tried on a real phone |
 
 ## Live
 
@@ -145,6 +145,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 22 (#87, part 5):** **Exam practice** is built. On the 2 days before an exam, Tasks has a practice row
+  that opens `#/practice/<examId>`. The AI writes a short-answer question for each section (`written`); the
+  multiple choice comes from the banks. No feedback until the end, then the AI marks the short answers (`grade`;
+  a blank one is 0 and never sent), one attempt per section is saved, and the results show every answer. When
+  writing fails, the practice can go on with the multiple choice alone; when marking fails, it can be tried again
+  or saved without the unmarked ones, which don't count. Never a made-up mark. A browser test checks the typed
+  answer goes only to `/ai/grade`. 16 deliberate breaks, all caught. **Milestone 9 is done.**
 
 - **Nov 22 (#120, part 1):** Exam style contract. `src/types/style.ts` (materials, notes, the guide, `ExamStyleStore`; storage next).
   Questions have `form` (`choice` | `short`) and `level` 1-3; older ones read as choice, level 2 (`withDefaults`, `isChoice`). Attempts

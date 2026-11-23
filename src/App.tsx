@@ -24,6 +24,7 @@ import type { Vault, VaultStatus } from './ui/vault';
 const SlidesScreen = lazy(() => import('./ui/SlidesScreen'));
 const QuizScreen = lazy(() => import('./ui/QuizScreen'));
 const PlayScreen = lazy(() => import('./ui/PlayScreen'));
+const PracticeScreen = lazy(() => import('./ui/PracticeScreen'));
 
 // The page frame: the name (back to Tasks, the home page) and Lock, the current screen, a footer with
 // today's study day and whether the app is ready to work offline, and on the three main pages (Tasks,
@@ -119,6 +120,11 @@ function Screen({
       {route.name === 'play' && (
         <Suspense fallback={<p className="muted">Getting today ready…</p>}>
           <PlayScreen />
+        </Suspense>
+      )}
+      {route.name === 'practice' && (
+        <Suspense fallback={<p className="muted">Getting the practice ready…</p>}>
+          <PracticeScreen key={href(route)} examId={route.examId} />
         </Suspense>
       )}
       {route.name === 'settings' && <SettingsScreen onLock={onLock} onReplaced={onReplaced} />}

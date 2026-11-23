@@ -115,7 +115,8 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   Settings' AI sign-in check and Compare models. Planner (#47): `TasksScreen` (#77: today by class from `src/plan/tasks.ts`, the saved order by
   dragging, the progress bar, Start; `Penguin` when there's nothing; the daily minutes are in Settings), `PlayScreen`
   (`#/play`: each item's session with its timer, the quiz offered at 80%, then the quiz), `planning.ts`
-  (loads what the planner needs and the names to show).
+  (loads what the planner needs and the names to show). `PracticeScreen` (#87, `#/practice/<examId>`: exam
+  practice, short answers written and marked by AI; its pure parts in `src/quiz/practice.ts`).
 - `src/plan/`: the planner (#47), pure, with tests: `planner.ts` works out today's checklist from the
   lectures, study sessions and quiz attempts every time (nothing it works out is stored); `rules.ts` holds
   the numbers (days 1/3/7, the score table) in one place, to tune.
