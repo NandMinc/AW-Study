@@ -8,10 +8,9 @@ log). The design is in `DESIGN.md`; how we work together is in `../CLAUDE.md` ("
 
 Milestones 3 to 7 and 9 are **done** (9, exams, on Nov 22: #86, #87). The restyle is finished, and so are
 accounts and sync (#93-#108). Now: **exam style and question levels** (DESIGN, #117), in five steps:
-contract and storage #120 and the helper #121 are **done**; next the class page #122, the bank and planner
-#123, and the quiz screen #124. Milestone 8 (first run and after-class prompts) waits on a question for Matt
-and Nathan: are after-class prompts when you next open the app enough for now, or do we want real push
-notifications (DESIGN, "Open questions")?
+contract and storage #120, the helper #121 and the class page #122 are **done**; next the bank and planner
+#123, and the quiz screen #124. Milestone 8 (first run and after-class prompts): the after-class reminder is #129 (ask when the app opens,
+Matt's choice, Nov 22).
 
 Milestone 3, **Lock it down** (done): encryption, the recovery key, persistent storage, backup and
 restore, in the GitHub milestone "M3: Lock it down".
@@ -65,6 +64,8 @@ slides" and "M6: AI helper and quizzes":
 | Design: exam style guide per class, question levels, short answers in quizzes | #117 | Nathan's Claude | `docs/DESIGN.md` ("Exam style and question levels", the Quizzes decision, two open questions) | **Done** (PR #119, Matt's OK); built in #120-#124. Scores weighted by level; "File types to support" list (Nathan, Nov 22) |
 | Exam style 1: contract and storage | #120 | Nathan's Claude | new `src/types/style.ts`; `Level`, `ChoiceQuestion`/`ShortQuestion`, `ShortAnswer`, the weighted score in `src/types/quiz.ts`; `src/db/quiz.ts` (forms, levels, short answers, weighted score); `pickQuiz` multiple choice only for now; then the materials and guide storage in `src/db/` and sync | Contract and quiz storage **done** (PR #126); materials and guide storage **this PR** (schema step 9, `src/db/style.ts`, sync incl. the sync server) |
 | Exam style 2: helper jobs (`style`, `grade-many`, levels and forms in `questions`) | #121 | Matt's Claude | `helper/jobs.mjs`, `tests/helper/`, `src/ai/` (backend, http, fake, check, new `style.ts`), the filter in `CompareModels.tsx` | **Done** (PR #127). **The helper changed: press Update for `honed-ai`** |
+| Exam style 3: the class page's Exam style (documents, notes, the guide) | #122 | Matt's Claude | new `src/ui/ExamStyleSection.tsx`, `src/quiz/guide.ts`, `readMaterialFile` in `src/ui/pdf-file.ts`, the `style` part in `route.ts` and `ClassMenu.tsx`, its place in `ClassScreen.tsx`, the exam style styles, `tests/browsers/exam-style.spec.ts` | **Done** (PR #130) |
+| After-class reminder: a popup when Honed opens links to the lecture to fill in | #129 | (free) | new `src/ui/AfterClass.tsx`, the reminder logic in `src/ui/classes.ts`, `src/App.tsx` | Not started. Matt's choice (Nov 22): ask when the app opens, not push |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -147,6 +148,17 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 22 (#122):** A class's **Exam style** on its page (and in the Classes page's menu): documents (PDF or text,
+  each a past exam, outline, practice set or other), notes about the exam, and the guide (read, edit, Remake).
+  The guide is made only when the student acts (Write the guide, Remake, or changing the documents or notes
+  there): opening the page sends nothing, it only says when the guide is out of date (`src/quiz/guide.ts`;
+  `refreshGuide` brings it up to date when #123 makes questions). A first version made it on opening the page;
+  78 browser tests failed on the unanswered `/ai/style`, which showed it broke SECURITY.md's "nothing is sent
+  unless asked for". Browser tests check that opening sends nothing, and that the documents' text and the notes
+  go only to `/ai/style`. 19 deliberate breaks, all caught.
+- **Nov 22 (#129):** New task: an after-class reminder when Honed opens (Matt). This answers DESIGN's open
+  question "After-class prompts" for now: ask when the app is opened, not by push.
 
 - **Nov 22 (#121):** The AI helper's exam style jobs. `questions` takes the class's guide and a `mix` (how many
   at each level, and how many short answers). Every question now comes back with its level (2 when the AI gives

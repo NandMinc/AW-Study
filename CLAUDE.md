@@ -103,7 +103,8 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   (`#/class/<id>/cover/<date>`, from a date button). Classes (#26): `ClassesScreen`,
   `ClassScreen`, `ClassEditor`, `ExamEditor`, `LectureForm` ("What was covered?"), `SlidesScreen`
   (the viewer, loaded lazily with PDF.js), `pdf-file.ts` (reading a picked PDF) and `classes.ts`
-  (pure helpers with tests: lecture times, the latest lecture, labels). Quizzes (#40): `QuizScreen` (making
+  (pure helpers with tests: lecture times, the latest lecture, labels). `ExamStyleSection` (#122: a class's
+  documents, notes and exam style guide; the guide's upkeep is `src/quiz/guide.ts`). Quizzes (#40): `QuizScreen` (making
   the bank, the quiz, loaded lazily), `ai-context.ts` (the `AiBackend` the screens use: `HttpAiBackend`).
   `MathText` (quiz text with LaTeX between `\(` `\)` or `\[` `\]`, drawn by KaTeX with `trust: false`; never
   `renderToString` into HTML, whose inline styles the CSP blocks; fonts must not be inlined).

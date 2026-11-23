@@ -380,7 +380,7 @@ test('the Classes page: each class’s menu opens that part of its page, and del
 
   // Escape and a tap elsewhere close it
   await menuButton.click();
-  await expect(menu.getByRole('listitem')).toHaveText(['What lectures covered', 'Class details', 'Exams', 'Files', 'Delete class']);
+  await expect(menu.getByRole('listitem')).toHaveText(['What lectures covered', 'Class details', 'Exams', 'Exam style', 'Files', 'Delete class']);
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   await expect(menuButton).toBeFocused();
@@ -392,6 +392,10 @@ test('the Classes page: each class’s menu opens that part of its page, and del
   await choose('Exams');
   await expect(page).toHaveURL(/#\/class\/[^/]+\/exams$/);
   await expect(page.getByRole('heading', { level: 3, name: 'Exams' })).toBeFocused();
+  await back();
+  await choose('Exam style');
+  await expect(page).toHaveURL(/#\/class\/[^/]+\/style$/);
+  await expect(page.getByRole('heading', { level: 3, name: 'Exam style' })).toBeFocused();
   await back();
   await choose('Files');
   await expect(page.getByRole('heading', { level: 3, name: 'Slide decks' })).toBeFocused();
