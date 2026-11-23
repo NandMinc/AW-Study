@@ -55,6 +55,8 @@ describe('parseRoute', () => {
     const routes: Exclude<Route, { name: 'not-found' }>[] = [
       { name: 'tasks' },
       { name: 'classes' },
+      { name: 'classes', adding: true },
+      { name: 'tasks', tour: true },
       { name: 'class', courseId: 'c1' },
       { name: 'class', courseId: 'c1', part: 'lectures' },
       { name: 'class', courseId: 'c1', part: 'files' },

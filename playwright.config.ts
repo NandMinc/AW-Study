@@ -11,7 +11,21 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0, // a flaky test gets fixed, never rerun until green
   reporter: process.env.CI ? 'github' : 'list',
-  use: { baseURL: `http://127.0.0.1:${PORT}` },
+  use: {
+    baseURL: `http://127.0.0.1:${PORT}`,
+    // Every test starts past the first run's tour and Getting started (#136), as if seen: they'd stand in front of
+    // every screen. tests/browsers/first-run.spec.ts starts without this. localhost too: the passkey test uses it.
+    storageState: {
+      cookies: [],
+      origins: [`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`].map((origin) => ({
+        origin,
+        localStorage: [
+          { name: 'honed:tour-seen', value: '1' },
+          { name: 'honed:getting-started-skipped', value: '1' },
+        ],
+      })),
+    },
+  },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
     { name: 'android', use: { ...devices['Pixel 7'] } },

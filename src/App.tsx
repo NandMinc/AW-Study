@@ -106,8 +106,8 @@ function Screen({
 }) {
   return (
     <>
-      {route.name === 'tasks' && <TasksScreen key={dataVersion} />}
-      {route.name === 'classes' && <ClassesScreen key={dataVersion} />}
+      {route.name === 'tasks' && <TasksScreen key={dataVersion} tour={route.tour} />}
+      {route.name === 'classes' && <ClassesScreen key={dataVersion} adding={route.adding} />}
       {route.name === 'class' && <ClassScreen key={href(route)} courseId={route.courseId} part={route.part} cover={route.cover} />}
       {route.name === 'slides' && (
         <Suspense fallback={<p className="muted">Opening the slides…</p>}>
