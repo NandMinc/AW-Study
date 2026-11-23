@@ -2,7 +2,7 @@
 // before setup (plain records) and encrypted, like lectures.test.ts.
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { QuestionInput } from '../types/quiz';
+import type { QuestionInput, WrittenAnswer } from '../types/quiz';
 import { questionKey } from './quiz';
 import { openHonedDb, RECORD_STORES } from './schema';
 import { openStudyStore, type StudyStore } from './store';
@@ -184,6 +184,94 @@ describe.each(['before setup (plain)', 'encrypted'] as const)('quiz store, %s', 
       await store.deleteQuestion(qa!.id);
       expect((await store.listQuizAttempts(a.id))[0]!.answers[0]!.questionId).toBe(qa!.id);
     });
+
+    it('an ordinary quiz has no examId or written', async () => {
+      const { a } = await setting();
+      const [q1] = await store.addQuestions(a.id, [q(1)]);
+      const attempt = await store.recordQuizAttempt({ sectionId: a.id, startedAt: T1, finishedAt: T2, answers: [{ questionId: q1!.id, chosen: 0, ms: 1 }] });
+      expect(Object.keys(attempt)).not.toContain('examId');
+      expect(Object.keys(attempt)).not.toContain('written');
+    });
+  });
+
+  describe('exam practice (#87)', () => {
+    const w = (extra: Partial<WrittenAnswer> = {}): WrittenAnswer => ({
+      question: 'Why does slide 22 call the bond polar?',
+      points: ['Different electronegativities', 'Electrons shared unequally', 'A partial charge on each atom'],
+      page: 22,
+      answer: 'Oxygen pulls the electrons harder.',
+      mark: 2,
+      feedback: 'Good; say what that does to the charges.',
+      ms: 61_000,
+      ...extra,
+    });
+    const exam = (courseId: string) => store.addExam({ courseId, title: 'Midterm 1', kind: 'midterm', date: '2026-12-01', lectureIds: null });
+
+    it('scores a short answer as one question worth mark / points, rounded to 2 places', async () => {
+      const { a, course } = await setting();
+      const midterm = await exam(course.id);
+      const [q1, q2] = await store.addQuestions(a.id, [q(1), q(2)]);
+      const attempt = await store.recordQuizAttempt({
+        sectionId: a.id,
+        startedAt: T1,
+        finishedAt: T2,
+        examId: midterm.id,
+        answers: [
+          { questionId: q1!.id, chosen: 0, ms: 1 }, // right
+          { questionId: q2!.id, chosen: 1, ms: 1 }, // wrong
+        ],
+        written: [w(), w({ question: 'Name the bond on slide 23.', page: 23, points: ['Covalent'], mark: 1 })],
+      });
+      // 1 + 2/3 + 1 = 2.666… → 2.67, of 4
+      expect(attempt).toMatchObject({ examId: midterm.id, right: 2.67, asked: 4 });
+      expect(attempt.score).toBeCloseTo(2.67 / 4);
+      expect(attempt.written).toEqual([w(), w({ question: 'Name the bond on slide 23.', page: 23, points: ['Covalent'], mark: 1 })]);
+      expect(await store.listQuizAttempts(a.id)).toEqual([attempt]);
+    });
+
+    it('can be only short answers (a section with no bank yet), trimmed', async () => {
+      const { a, course } = await setting();
+      const midterm = await exam(course.id);
+      const attempt = await store.recordQuizAttempt({
+        sectionId: a.id,
+        startedAt: T1,
+        finishedAt: T2,
+        examId: midterm.id,
+        answers: [],
+        written: [w({ answer: '  ', mark: 0, question: '  Spaced?  ', ms: -3 })],
+      });
+      expect(attempt).toMatchObject({ right: 0, asked: 1, score: 0 });
+      expect(attempt.written![0]).toMatchObject({ question: 'Spaced?', answer: '', ms: 0 });
+    });
+
+    it('refuses an exam that isn’t this class’s, and short answers out of shape', async () => {
+      const { a, course } = await setting();
+      const midterm = await exam(course.id);
+      const other = await store.createCourse({ name: 'PHYS 150', meetings: [], termStart: null, termEnd: null });
+      const theirs = await exam(other.id);
+      const base = { sectionId: a.id, startedAt: T1, finishedAt: T2, answers: [], examId: midterm.id };
+      const cases: [string, Parameters<StudyStore['recordQuizAttempt']>[0]][] = [
+        ['another class’s exam', { ...base, examId: theirs.id, written: [w()] }],
+        ['an exam that doesn’t exist', { ...base, examId: 'nope', written: [w()] }],
+        ['no answers of either kind', { ...base, written: [] }],
+        ['written not a list', { ...base, written: 'w' as never }],
+        ['slide before the section', { ...base, written: [w({ page: 20 })] }],
+        ['slide after the section', { ...base, written: [w({ page: 31 })] }],
+        ['empty question', { ...base, written: [w({ question: ' ' })] }],
+        ['question too long', { ...base, written: [w({ question: 'x'.repeat(1_001) })] }],
+        ['no points', { ...base, written: [w({ points: [], mark: 0 })] }],
+        ['seven points', { ...base, written: [w({ points: Array.from({ length: 7 }, (_, i) => `p${i}`) })] }],
+        ['an empty point', { ...base, written: [w({ points: ['a', ' ', 'c'] })] }],
+        ['answer too long', { ...base, written: [w({ answer: 'x'.repeat(4_001) })] }],
+        ['feedback too long', { ...base, written: [w({ feedback: 'x'.repeat(401) })] }],
+        ['mark above the points', { ...base, written: [w({ mark: 4 })] }],
+        ['negative mark', { ...base, written: [w({ mark: -1 })] }],
+        ['part of a mark', { ...base, written: [w({ mark: 1.5 })] }],
+        ['21 short answers', { ...base, written: Array.from({ length: 21 }, (_, i) => w({ question: `Q${i}` })) }],
+      ];
+      for (const [label, input] of cases) await expect(store.recordQuizAttempt(input), label).rejects.toMatchObject({ code: 'invalid' });
+      expect(await store.listQuizAttempts()).toEqual([]);
+    });
   });
 
   describe('deleting', () => {
@@ -231,7 +319,7 @@ describe.each(['before setup (plain)', 'encrypted'] as const)('quiz store, %s', 
 });
 
 describe('encrypted, on disk', () => {
-  it('no question, option, explanation or answer is readable, and only SECURITY.md’s fields are', async () => {
+  it('no question, option, explanation, answer or short answer is readable, and only SECURITY.md’s fields are', async () => {
     name = `quiz-${++counter}`;
     store = await openStudyStore({ name });
     const key = await newDataKey();
@@ -240,7 +328,15 @@ describe('encrypted, on disk', () => {
     const [q1] = await store.addQuestions(a.id, [
       { page: 21, question: `Q ${MARKER}`, options: [`A ${MARKER}`, 'b', 'c', 'd'], answer: 0, explanation: `E ${MARKER}` },
     ]);
-    await store.recordQuizAttempt({ sectionId: a.id, startedAt: T1, finishedAt: T2, answers: [{ questionId: q1!.id, chosen: 0, ms: 1 }] });
+    const midterm = await store.addExam({ courseId: a.courseId, title: 'Midterm', kind: 'midterm', date: '2026-12-01', lectureIds: null });
+    await store.recordQuizAttempt({
+      sectionId: a.id,
+      startedAt: T1,
+      finishedAt: T2,
+      examId: midterm.id,
+      answers: [{ questionId: q1!.id, chosen: 0, ms: 1 }],
+      written: [{ question: `WQ ${MARKER}`, points: [`P ${MARKER}`], page: 21, answer: `WA ${MARKER}`, mark: 1, feedback: `F ${MARKER}`, ms: 1 }],
+    });
     store.close();
     const db = await openHonedDb(name);
     for (const s of [...RECORD_STORES, 'meta'] as const) expect(containsText(await db.getAll(s), MARKER), s).toBe(false);

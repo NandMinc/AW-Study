@@ -48,5 +48,7 @@ export function pickQuiz(questions: Question[], attempts: QuizAttempt[], size = 
 
 /** "4 of 5 right (80%)". */
 export function describeScore(right: number, asked: number): string {
-  return `${right} of ${asked} right (${Math.round((100 * right) / Math.max(1, asked))}%)`;
+  // Exam practice's short answers count in parts (#87): show those to one place, "7.7 of 10"
+  const shown = Number.isInteger(right) ? String(right) : (Math.round(right * 10) / 10).toString();
+  return `${shown} of ${asked} right (${Math.round((100 * right) / Math.max(1, asked))}%)`;
 }

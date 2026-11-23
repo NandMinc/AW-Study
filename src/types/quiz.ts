@@ -33,8 +33,26 @@ export interface QuizAnswer {
 }
 
 /**
+ * A short answer in exam practice (#87): the question as the AI wrote it at practice time (not banked),
+ * what was typed, and the mark the AI's grade job gave it. It counts as one question worth
+ * mark / points.length.
+ */
+export interface WrittenAnswer {
+  question: string; // 1-1,000 characters
+  points: string[]; // 1-6, what a full answer says, 1-500 characters each
+  page: number; // the slide it's about: within the section's range
+  answer: string; // what was typed, 0-4,000 characters
+  mark: number; // a whole number, 0 to points.length
+  feedback: string; // the grade's feedback, 0-400 characters
+  ms: number; // time taken to answer, 0 or more
+}
+
+/**
  * One quiz on one section, saved when it ends. Attempts are only ever added, never changed: they are
  * the history the schedule learns from (DESIGN). The score comes from the answers alone.
+ *
+ * Exam practice (#87) saves one attempt per section it covered, with `examId` set; its short answers
+ * are in `written`. Both are absent on ordinary quizzes and on every attempt saved before #87.
  */
 export interface QuizAttempt {
   id: string;
@@ -43,8 +61,13 @@ export interface QuizAttempt {
   startedAt: string;
   finishedAt: string;
   answers: QuizAnswer[]; // in the order asked; each question at most once
+  /** Exam practice only: the exam it was practice for (of the same class). */
+  examId?: string;
+  /** Exam practice only: the short answers, in the order asked. */
+  written?: WrittenAnswer[];
+  /** Multiple-choice answers right, plus each short answer's mark / points.length; rounded to 2 places. */
   right: number;
-  asked: number; // answers.length, at least 1
+  asked: number; // answers.length + written.length, at least 1
   score: number; // right / asked, 0 to 1
   createdAt: string;
 }
@@ -54,6 +77,8 @@ export interface QuizAttemptInput {
   startedAt: string;
   finishedAt: string;
   answers: { questionId: string; chosen: OptionIndex; ms: number }[];
+  examId?: string;
+  written?: WrittenAnswer[];
 }
 
 /**
@@ -72,7 +97,11 @@ export interface QuizStore {
   addQuestions(sectionId: string, questions: QuestionInput[]): Promise<Question[]>;
   /** Removes a bad question from the bank. Attempts that asked it keep their record of it. */
   deleteQuestion(id: string): Promise<void>;
-  /** Saves a finished quiz, marking each answer against the stored question. */
+  /**
+   * Saves a finished quiz, marking each multiple-choice answer against the stored question. 'invalid' if
+   * it has no answers of either kind, an exam that isn't this class's, or a short answer out of shape
+   * (see WrittenAnswer: its slide outside the section, a mark that isn't a whole number in range).
+   */
   recordQuizAttempt(input: QuizAttemptInput): Promise<QuizAttempt>;
   /** Attempts, newest first: one section's, or every section's (for the planner). */
   listQuizAttempts(sectionId?: string): Promise<QuizAttempt[]>;

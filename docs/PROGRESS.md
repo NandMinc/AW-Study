@@ -49,11 +49,11 @@ slides" and "M6: AI helper and quizzes":
 | Restyle step 4: Settings on one page (AI sign-in check, Compare models) | #79 | Matt's Claude | `src/ui/AiSettings.tsx`, `status()` in `src/ai/` (backend, http, fake, tests), one line of `SettingsScreen.tsx`, the quiz route's `/compare` and its prop in `QuizScreen.tsx`, `tests/browsers/settings.spec.ts` | **Done** (PR #80). Daily minutes came to Settings with #78 |
 | Restyle step 5: the other screens to match (setup, unlock, a class's page, What was covered?, the viewer, quizzes, Play) | #82 | Matt's Claude | the step 5 block at the end of `src/app.css`, `className="back"` on the back links | **Done** (PR #83). The restyle is finished |
 | Milestone 9a: exams pull their sections forward (planner) | #86 | Matt's Claude | the exam rules in `src/plan/planner.ts` (+ `RULES.examPullDays`, `examQuizzes`), `PlanInput.exams`, `Plan.examsOver` (through `tasks.ts`), loading exams in `planning.ts`, the note on `TasksScreen.tsx` | **Done** (PR #88) |
-| Milestone 9b: exam practice with AI-graded short answers | #87 | Matt's Claude | to be proposed in #87 (contract first) | Next |
+| Milestone 9b: exam practice with AI-graded short answers | #87 | Matt's Claude | the contract: `WrittenAnswer`, `examId` and `written` in `src/types/quiz.ts`, `recordQuizAttempt` in `src/db/quiz.ts`, `describeScore` in `src/quiz/pick.ts`; then the planner's practice item, the screen | Helper job (PR #89) and contract (PR #114) **done**; the planner's practice item next, then the screen |
 | Viewer: fit width for portrait pages (documents saved as PDF) | #46 | Nathan's Claude | `src/viewer/SlideViewer.tsx`, `viewer.css`, new `fit.ts` + `fit.test.ts`, the page size in `test-pdf.ts`, `tests/browsers/viewer.spec.ts` | **Done** (this PR). Try on a real phone after deploy |
-| Accounts and sync (v2), testing phase on the home server: **design first** | #93 | Nathan's Claude | `docs/SECURITY.md` ("Accounts and sync"), the accounts lines in `docs/DESIGN.md` | Design PR open for Matt and Matt's Claude to read; then sign-in and accounts, syncing the small records and PDFs on demand, each its own issue |
+| Accounts and sync (v2), testing phase on the home server: **design first** | #93 | Nathan's Claude | `docs/SECURITY.md` ("Accounts and sync"), the accounts lines in `docs/DESIGN.md` | **Done** (design merged; built in #95, #105, #108) |
 | Sync step 1: the `honed-sync` server's Google sign-in and accounts, Settings' Account box | #95 | Nathan's Claude | `sync/`, `tests/sync/`, the `sync-image` CI job, `/api/` in `vite.config.ts` and `app.spec.ts`, `src/sync/`, one line of `SettingsScreen.tsx`, `tests/browsers/account.spec.ts` | **Done** (this PR). Live once Nathan sets up the server side (Google client, dataset, app, tunnel route) |
-| Remember this device, and opt-in Google unlock: **design first** | #97 | Nathan's Claude | `docs/SECURITY.md` ("Remembering a device", "Google unlock", the threat table), a line of `docs/DESIGN.md` | Design PR open for Matt to read; then remembering a device (its own PR), Google unlock with sync step 2 |
+| Remember this device, and opt-in Google unlock: **design first** | #97 | Nathan's Claude | `docs/SECURITY.md` ("Remembering a device", "Google unlock", the threat table), a line of `docs/DESIGN.md` | **Done** (design merged; built in #99, #101) |
 | Remember this device: unlock once, then open straight in | #99 | Nathan's Claude | `RememberedKey` in `src/types/crypto.ts`, `rememberKey`/`recallKey` in `src/lib/crypto.ts`, `getRemembered`/`remember`/`forget` in `src/db/store.ts` and `src/ui/vault.ts`, `openKey` in `src/ui/keys.ts`, the unlock and setup screens, Lock in `src/App.tsx`, `src/ui/ThisDevice.tsx` (Settings), the test helpers (unticked by default) | **Done** (this PR). Try on a real phone after deploy |
 | Google unlock: a Google sign-in opens Honed instead of a passkey (opt-in) | #101 | Nathan's Claude | `sync/` (schema step 2, `/api/unlock-key`, `/api/unlock-uses`), the `google` keyring method (`src/types/crypto.ts`, `wrapWithGoogleKey` in `src/lib/crypto.ts`, the keyring rule in `src/db/store.ts`), `src/sync/client.ts`, `src/sync/GoogleUnlockSettings.tsx`, the unlock and setup screens, ProveItsYou, `src/App.tsx` (the return addresses) | **Done** (this PR). Needs both images deployed (honed-sync and site-honed) |
 | Sync step 2: classes, lectures, quizzes and notes between devices | #105 | Nathan's Claude | server: `sync/` (schema step 3, `/api/keyring`, `/api/changes`), `tests/sync/`; app: `src/db/store.ts` and `schema.ts` (step 8: change-log indexes), `src/sync/`, Settings and setup | **Done** (server PR #106, app this PR). Slide PDFs are step 3 |
@@ -74,7 +74,7 @@ slides" and "M6: AI helper and quizzes":
 | 6 | AI helper and quizzes | **Helper live** (#27); question banks and quizzes **done** (#40); scores moving the schedule waits for 5 |
 | 7 | Viewer tools: highlights, notes, explain, ask | **Done** (#56); not yet tried on a real phone |
 | 8 | First run (tutorial) and after-class prompts | Not started |
-| 9 | Exams: pulling forward, practice tests with AI-graded short answers | **Pulling forward done** (#86); exam practice next (#87) |
+| 9 | Exams: pulling forward, practice tests with AI-graded short answers | **Pulling forward done** (#86); exam practice: helper and contract done, the planner and screen next (#87) |
 
 ## Live
 
@@ -136,6 +136,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 22 (#87, part 3):** Exam practice's contract (contract change, agreed in #87). `QuizAttempt` gains
+  `examId` and `written` (`WrittenAnswer`: the AI's question, its 1-6 points, the slide, what was typed, the
+  mark, the feedback), both optional, so older attempts read unchanged and sync carries them as before. A
+  short answer counts as one question worth mark ÷ points; `right` is rounded to 2 places, and
+  `describeScore` shows it to one ("7.7 of 10 right"). The store checks the exam is the class's, each short
+  answer's slide, mark (a whole number in range) and lengths, and takes an attempt of only short answers.
+  20 deliberate breaks, all caught.
 
 - **Nov 22 (#112):** **CI is faster.** The unit tests and the browser tests (4 shards) run side by side, and the three images are built and checked alongside them, pushed under the commit only; a `publish` job moves the three `:main` tags once the tests passed. A push to main that merges a PR with exactly the same files, whose run passed, skips the tests (the `gate` job). The same change on Nathan's chess repo took a PR run from ~210 s to 98 s and the main run from ~200 s to 53 s. Local `npm test` is unchanged.
 

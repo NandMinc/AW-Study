@@ -168,5 +168,8 @@ describe('pickQuiz', () => {
   it('describes a score', () => {
     expect(describeScore(4, 5)).toBe('4 of 5 right (80%)');
     expect(describeScore(2, 3)).toBe('2 of 3 right (67%)');
+    // Exam practice: short answers count in parts
+    expect(describeScore(7.67, 10)).toBe('7.7 of 10 right (77%)');
+    expect(describeScore(2.5, 4)).toBe('2.5 of 4 right (63%)');
   });
 });
