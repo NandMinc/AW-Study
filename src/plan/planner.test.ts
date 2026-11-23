@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { Exam, Lecture, Section } from '../types/lecture';
 import type { StudySession } from '../types/plan';
 import type { QuizAttempt } from '../types/quiz';
-import { addDays, afterScore, examCovers, examQuizDue, examsInRunUp, firstWeekQuizSize, planDay, quizMinutes, thirds, type PlanInput } from './planner';
+import { addDays, afterScore, examCovers, examQuizDue, examsInRunUp, firstWeekQuizSize, planDay, practiceMinutes, quizMinutes, thirds, type PlanInput } from './planner';
 
 let n = 0;
 const at = (day: string, hour = 12) => `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`;
@@ -324,5 +324,66 @@ describe('exams pull their sections forward (#86)', () => {
     expect(examQuizDue(midterm, la, ['2026-11-26'])).toBe('2026-11-27'); // at least a day later
     expect(examQuizDue(midterm, la, ['2026-11-27'])).toBeNull(); // by the day before at the latest
     expect(examQuizDue(midterm, la, ['2026-11-19', '2026-11-24'])).toBeNull();
+  });
+});
+
+describe('exam practice on the last 2 days (#87)', () => {
+  function exam(date: string, lectureIds: string[] | null = null, courseId = 'c'): Exam {
+    return { id: `e${++n}`, courseId, title: 'Final', kind: 'final', date, lectureIds, createdAt: at('2026-10-01'), updatedAt: at('2026-10-01') };
+  }
+  const practiced = (e: Exam, s: Section, day: string): QuizAttempt => ({ ...quizzed(s, day, 0.8), examId: e.id });
+  const l1 = lecture('2026-10-01');
+  const l2 = lecture('2026-10-08');
+  const later = section(l2);
+  const earlier = section(l1);
+  const base = { lectures: [l1, l2], sections: [later, earlier] };
+  const final = exam('2026-12-10');
+
+  it('offered 2 days and 1 day before, across the sections it covers in lecture order; not before, not on the day', () => {
+    expect(plan('2026-12-07', { ...base, exams: [final] }).practice).toEqual([]);
+    const p = plan('2026-12-08', { ...base, exams: [final] });
+    expect(p.practice).toEqual([
+      { kind: 'practice', examId: final.id, courseId: 'c', sectionIds: [earlier.id, later.id], mcPerSection: 2, writtenPerSection: 1, minutes: 9, due: '2026-12-08' },
+    ]);
+    expect(plan('2026-12-09', { ...base, exams: [final] }).practice.map((i) => i.due)).toEqual(['2026-12-08']);
+    expect(plan('2026-12-10', { ...base, exams: [final] }).practice).toEqual([]);
+    expect(plan('2026-12-08', base).practice).toEqual([]);
+  });
+
+  it('once: done when a practice for that exam was saved since its first day (not one from before)', () => {
+    const early = [practiced(final, earlier, '2026-12-01')];
+    expect(plan('2026-12-09', { ...base, exams: [final], attempts: early }).practice).toHaveLength(1);
+    const done = [practiced(final, earlier, '2026-12-08')];
+    expect(plan('2026-12-09', { ...base, exams: [final], attempts: done }).practice).toEqual([]);
+    const otherExam = [practiced(exam('2026-12-20'), earlier, '2026-12-08')];
+    expect(plan('2026-12-09', { ...base, exams: [final], attempts: otherExam }).practice).toHaveLength(1);
+    const plainQuiz = [quizzed(earlier, '2026-12-08', 0.9)];
+    expect(plan('2026-12-09', { ...base, exams: [final], attempts: plainQuiz }).practice).toHaveLength(1);
+  });
+
+  it('only the lectures it covers, of its own class; none when it covers nothing', () => {
+    expect(plan('2026-12-08', { ...base, exams: [exam('2026-12-10', [l2.id])] }).practice[0]!.sectionIds).toEqual([later.id]);
+    expect(plan('2026-12-08', { ...base, exams: [exam('2026-12-10', null, 'other')] }).practice).toEqual([]);
+  });
+
+  it('at most 10 sections: the weakest, never quizzed counting as weakest, still in lecture order', () => {
+    const ls = Array.from({ length: 12 }, (_, i) => lecture(addDays('2026-10-01', i)));
+    const ss = ls.map((l) => section(l));
+    // The first two lectures are the strongest; the third has never been quizzed
+    const attempts = ss.flatMap((s, i) => (i === 2 ? [] : [quizzed(s, '2026-11-20', i < 2 ? 1 : 0.5)]));
+    const p = plan('2026-12-08', { lectures: ls, sections: ss, attempts, exams: [final] });
+    expect(p.practice[0]!.sectionIds).toEqual(ss.slice(2).map((s) => s.id));
+    expect(p.practice[0]!.minutes).toBe(practiceMinutes(10));
+    expect(practiceMinutes(10)).toBe(Math.ceil((20 * 40) / 60) + 30); // 20 questions at 40 s, 10 short answers at 3 min
+  });
+
+  it('two exams close together: one practice each, soonest first, kept apart from the day’s items', () => {
+    const quiz = exam('2026-12-09');
+    const p = plan('2026-12-08', { ...base, exams: [final, quiz] });
+    expect(p.practice.map((i) => i.examId)).toEqual([quiz.id, final.id]);
+    // Practice isn't among today's section items or their minutes
+    expect(p.today.length).toBeGreaterThan(0);
+    expect(p.today.every((i) => base.sections.some((s) => s.id === i.sectionId))).toBe(true);
+    expect(p.plannedMinutes).toBe(p.today.reduce((sum, i) => sum + i.minutes, 0));
   });
 });

@@ -111,7 +111,12 @@ The first gap after week one is 7 days. These numbers are a starting point, kept
 **Exams**
 
 - From **10 days before** an exam, every section it covers is pulled forward so it's quizzed at least twice before the day, weakest sections first (Nov 20, #86): with no quiz in those days yet, one at once; after one, the next halfway to the exam (at least a day later, by the day before). A section whose study or quiz is already on today gets nothing extra. These go on today even past the daily minutes, and the Tasks page says which exam did it. Nothing is pulled on the exam day itself.
-- In the last **2 days**, an *exam practice* item appears: a mixed test with short-answer questions graded by AI.
+- In the last **2 days**, an *exam practice* item appears: a mixed test with short-answer questions graded by AI
+  (#87). It's offered 2 days and 1 day before, until one is done in those days (a practice from earlier doesn't
+  count), never on the day. It covers up to 10 of the exam's sections (the weakest, never quizzed counting as
+  weakest), shown in lecture order, with 2 multiple-choice and 1 short-answer question each: about 9 minutes for
+  2 sections, 44 for 10. It's planned past the daily minutes like the exam's quizzes, and kept apart from the
+  section items (`Plan.practice`), since it belongs to an exam, not one section.
 
 **Fitting the day**
 
