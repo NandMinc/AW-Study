@@ -16,8 +16,26 @@ export type PlanItem =
   | { kind: 'quiz'; sectionId: string; minutes: number; quizSize: number; due: string; overdueDays: number; examId?: string }
   | { kind: 'extra'; sectionId: string; minutes: number; due: string; overdueDays: number };
 
+/**
+ * Exam practice (#87): a mixed test across the sections an exam covers, on the last days before it. Kept
+ * apart from the section items (`Plan.practice`): it belongs to an exam, not one section.
+ */
+export interface PracticeItem {
+  kind: 'practice';
+  examId: string;
+  courseId: string;
+  /** The sections it asks about, in lecture order (the weakest ones when there are more than RULES allows). */
+  sectionIds: string[];
+  mcPerSection: number;
+  writtenPerSection: number;
+  minutes: number;
+  due: string; // the first day it's offered
+}
+
 export interface Plan {
   today: PlanItem[]; // what fits today, in the order to do it (Play runs through these)
+  /** Today's exam practice, soonest exam first (#87). Planned past the daily minutes, like the exam's quizzes. */
+  practice: PracticeItem[];
   later: PlanItem[]; // due, but over today's minutes: rolls into the coming days
   dailyMinutes: number;
   doneMinutes: number; // studied and quizzed already today (counts against the daily minutes)
@@ -178,6 +196,54 @@ export function examQuizDue(exam: Exam, lecture: Lecture, quizDays: readonly str
   return due <= last ? due : null;
 }
 
+/** Minutes an exam practice of this many sections takes (RULES.examPractice). */
+export function practiceMinutes(sections: number): number {
+  const { mcPerSection, writtenPerSection, minutesPerWritten } = RULES.examPractice;
+  return quizMinutes(sections * mcPerSection) + sections * writtenPerSection * minutesPerWritten;
+}
+
+/**
+ * Today's exam practice (#87): for each exam 1 to RULES.examPracticeDays days away, unless one was done
+ * since its first day, across the sections it covers (the weakest RULES.examPractice.maxSections, never
+ * quizzed counting as weakest), in lecture order.
+ */
+export function practiceFor(input: PlanInput): PracticeItem[] {
+  const day = (iso: string) => studyDay(new Date(iso), input.timeZone, input.dayStartHour);
+  const lectures = new Map(input.lectures.map((l) => [l.id, l]));
+  const items: PracticeItem[] = [];
+  const soonestFirst = [...(input.exams ?? [])].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  for (const exam of soonestFirst) {
+    const days = daysBetween(input.today, exam.date);
+    if (days < 1 || days > RULES.examPracticeDays) continue;
+    const from = addDays(exam.date, -RULES.examPracticeDays);
+    if (input.attempts.some((a) => a.examId === exam.id && day(a.finishedAt) >= from)) continue;
+    const covered = input.sections.flatMap((s) => {
+      const lecture = lectures.get(s.lectureId);
+      return lecture && examCovers(exam, lecture) ? [{ section: s, lecture }] : [];
+    });
+    if (covered.length === 0) continue;
+    const lastScore = (id: string) =>
+      input.attempts.filter((a) => a.sectionId === id).sort((a, b) => b.finishedAt.localeCompare(a.finishedAt))[0]?.score ?? -1;
+    const inOrder = (a: (typeof covered)[number], b: (typeof covered)[number]) =>
+      a.lecture.date.localeCompare(b.lecture.date) || a.section.firstPage - b.section.firstPage || a.section.id.localeCompare(b.section.id);
+    const chosen = [...covered]
+      .sort((a, b) => lastScore(a.section.id) - lastScore(b.section.id) || inOrder(a, b))
+      .slice(0, RULES.examPractice.maxSections)
+      .sort(inOrder);
+    items.push({
+      kind: 'practice',
+      examId: exam.id,
+      courseId: exam.courseId,
+      sectionIds: chosen.map((c) => c.section.id),
+      mcPerSection: RULES.examPractice.mcPerSection,
+      writtenPerSection: RULES.examPractice.writtenPerSection,
+      minutes: practiceMinutes(chosen.length),
+      due: from,
+    });
+  }
+  return items;
+}
+
 /** Today's checklist. */
 export function planDay(input: PlanInput): Plan {
   const day = (iso: string) => studyDay(new Date(iso), input.timeZone, input.dayStartHour);
@@ -256,6 +322,7 @@ export function planDay(input: PlanInput): Plan {
     dailyMinutes: input.dailyMinutes,
     doneMinutes,
     plannedMinutes: today.reduce((sum, i) => sum + i.minutes, 0),
+    practice: practiceFor(input),
     overBudget,
     examsOver: [...examsOver.values()],
   };
