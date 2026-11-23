@@ -17,9 +17,10 @@ import type { EncryptedRecord } from '../types/crypto';
 import type { Course, Exam, Lecture, Section, SlideDeck } from '../types/lecture';
 import type { StudySession, StudySettings } from '../types/plan';
 import type { Question, QuizAttempt } from '../types/quiz';
+import type { ClassMaterial, ExamStyle } from '../types/style';
 
 export const DB_NAME = 'honed';
-export const DB_VERSION = 8;
+export const DB_VERSION = 9;
 
 /**
  * One row of the change log: every write, in order, with the device that made it. v2's sync ships
@@ -30,10 +31,35 @@ export interface ChangeRecord {
   id: string;
   deviceId: string;
   at: string;
-  entity: 'course' | 'exam' | 'slideDeck' | 'lecture' | 'section' | 'question' | 'quizAttempt' | 'studySession' | 'settings' | 'annotation';
+  entity:
+    | 'course'
+    | 'exam'
+    | 'slideDeck'
+    | 'lecture'
+    | 'section'
+    | 'question'
+    | 'quizAttempt'
+    | 'studySession'
+    | 'settings'
+    | 'annotation'
+    | 'material'
+    | 'examStyle';
   entityId: string;
   op: 'put' | 'delete';
-  data: Course | Exam | SlideDeck | Lecture | Section | Question | QuizAttempt | StudySession | (StudySettings & { id: string }) | Annotation | null; // never PDF bytes
+  data:
+    | Course
+    | Exam
+    | SlideDeck
+    | Lecture
+    | Section
+    | Question
+    | QuizAttempt
+    | StudySession
+    | (StudySettings & { id: string })
+    | Annotation
+    | ClassMaterial
+    | StoredExamStyle
+    | null; // never file bytes
 }
 
 export interface SealedChange {
@@ -134,6 +160,35 @@ export interface SealedAnnotation {
   enc: EncryptedRecord; // the page is inside
 }
 
+// --- Exam style (#120): class materials and each class's exam style. Readable fields as in docs/SECURITY.md ---
+
+export interface SealedMaterial {
+  id: string;
+  courseId: string;
+  enc: EncryptedRecord;
+}
+/** A material's file. Plain before setup; sealed with encryptBytes (raw bytes), like a deck's PDF. */
+export interface MaterialFile {
+  id: string; // the material's id
+  data: Uint8Array;
+}
+/** A material's text, per page (a text file: one page). */
+export interface MaterialPages {
+  id: string; // the material's id
+  pages: string[];
+}
+/** A class's exam style as stored, under examStyleId(its class): one per class, the same id on every device. */
+export type StoredExamStyle = ExamStyle & { id: string };
+/**
+ * The id a class's exam style is stored under. Not the class's own id: sync finds a record's latest change by its
+ * id alone, so sharing the class's id made the class's changes and its style's overrule each other.
+ */
+export const examStyleId = (courseId: string) => `style-${courseId}`;
+export interface SealedExamStyle {
+  id: string;
+  enc: EncryptedRecord;
+}
+
 export interface HonedSchema extends DBSchema {
   // deviceId (string), keyring (Keyring), keycheck (EncryptedRecord), migration ('running'),
   // remembered (RememberedKey, #99), sync (SyncState, #105)
@@ -155,6 +210,10 @@ export interface HonedSchema extends DBSchema {
   studySessions: { key: string; value: StudySession | SealedStudySession; indexes: { byCourse: string; bySection: string } };
   settings: { key: string; value: (StudySettings & { id: string }) | SealedSettings };
   annotations: { key: string; value: Annotation | SealedAnnotation; indexes: { byCourse: string; byDeck: string } };
+  materials: { key: string; value: ClassMaterial | SealedMaterial; indexes: { byCourse: string } };
+  materialFiles: { key: string; value: MaterialFile | SealedDeckFile };
+  materialPages: { key: string; value: MaterialPages | SealedDeckPages };
+  examStyles: { key: string; value: StoredExamStyle | SealedExamStyle };
 }
 
 export type HonedDb = IDBPDatabase<HonedSchema>;
@@ -171,7 +230,11 @@ export type RecordStore =
   | 'quizAttempts'
   | 'studySessions'
   | 'settings'
-  | 'annotations';
+  | 'annotations'
+  | 'materials'
+  | 'materialFiles'
+  | 'materialPages'
+  | 'examStyles';
 /** Every store of records (everything but meta): what setUp seals and backups (#18) copy. */
 export const RECORD_STORES: RecordStore[] = [
   'changes',
@@ -187,6 +250,10 @@ export const RECORD_STORES: RecordStore[] = [
   'studySessions',
   'settings',
   'annotations',
+  'materials',
+  'materialFiles',
+  'materialPages',
+  'examStyles',
 ];
 
 /** Milestone 2's flashcard stores and change-log entities, dropped by step 4. */
@@ -269,6 +336,14 @@ export async function openHonedDb(name: string = DB_NAME): Promise<HonedDb> {
         const changes = tx.objectStore('changes') as unknown as IDBObjectStore;
         changes.createIndex('byId', 'id');
         changes.createIndex('byEntity', 'entityId');
+      }
+      // Step 9 (Nov 22, 2026, #120): each class's other documents (materials: the record, its file, its text) and
+      // its exam style (notes and the AI's guide; one per class, under examStyleId)
+      if (oldVersion < 9) {
+        db.createObjectStore('materials', { keyPath: 'id' }).createIndex('byCourse', 'courseId');
+        db.createObjectStore('materialFiles', { keyPath: 'id' });
+        db.createObjectStore('materialPages', { keyPath: 'id' });
+        db.createObjectStore('examStyles', { keyPath: 'id' });
       }
     },
   });

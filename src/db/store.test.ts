@@ -50,7 +50,10 @@ describe.each(['before setup (plain)', 'encrypted'] as const)('store, %s', (mode
       await store.deleteLecture(lecture.id);
       const log = await store.changesSince(0);
       expect(log.map((e) => `${e.entity}:${e.op}`)).toEqual(['course:put', 'slideDeck:put', 'lecture:put', 'section:put', 'section:delete', 'lecture:delete']);
-      expect(log.every((e) => e.deviceId === store.deviceId() && e.at === T0.toISOString())).toBe(true);
+      expect(log.every((e) => e.deviceId === store.deviceId())).toBe(true);
+      // The clock is frozen at T0: change times start there and still move forward, a millisecond each (#120),
+      // so another device can always tell which of this device's changes came last
+      expect(log.map((e) => Date.parse(e.at) - T0.getTime())).toEqual([0, 1, 2, 3, 4, 5]);
       expect(log[0]!.data).toEqual(c);
       expect(log.at(-1)!.data).toBeNull();
       expect(await store.latestChange()).toBe(log.at(-1)!.seq);

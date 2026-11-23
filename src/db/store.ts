@@ -22,16 +22,18 @@ import type { LectureStore, Section } from '../types/lecture';
 import type { AnnotationStore } from '../types/annotation';
 import type { PlanStore } from '../types/plan';
 import type { QuizStore } from '../types/quiz';
+import type { ExamStyleStore } from '../types/style';
 import { annotationMethods } from './annotations';
 import { lectureMethods, type FileSource } from './lectures';
 import { planMethods } from './plan';
 import { quizMethods } from './quiz';
+import { styleMethods } from './style';
 import { syncMethods, type SyncState, type WireChange } from './sync';
 import { DB_VERSION, openHonedDb, RECORD_STORES, type ChangeRecord, type HonedDb, type RecordStore } from './schema';
 
 export type StoreStatus = 'new' | 'locked' | 'unlocked';
 
-export interface StudyStore extends LectureStore, QuizStore, PlanStore, AnnotationStore {
+export interface StudyStore extends LectureStore, QuizStore, PlanStore, AnnotationStore, ExamStyleStore {
   deviceId(): string;
 
   // --- The lock side (the screens' `Vault`, src/ui/vault.ts) ---
@@ -153,6 +155,10 @@ const READABLE: Record<RecordStore, readonly string[]> = {
   studySessions: ['id', 'courseId', 'sectionId'],
   settings: ['id'],
   annotations: ['id', 'courseId', 'deckId'],
+  materials: ['id', 'courseId'],
+  materialFiles: ['id'], // raw bytes, like deckFiles
+  materialPages: ['id'],
+  examStyles: ['id'], // examStyleId(the class)
 };
 const KEYCHECK_AAD = 'honed:v1:meta:keycheck';
 
@@ -198,9 +204,13 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
   // Change times only move forward past the latest change applied from another device (#105): an edit
   // made after seeing another device's edit then wins over it, even with this device's clock a little behind.
   let seenAt = 0;
+  // And past this device's own last change (#120): two edits of one record in the same millisecond had the same
+  // time and device, so another device couldn't tell which came last and kept the first.
+  let lastAt = 0;
   const changeAt = () => {
-    const now = deps.clock().getTime();
-    return new Date(now > seenAt ? now : seenAt + 1).toISOString();
+    const at = Math.max(deps.clock().getTime(), seenAt + 1, lastAt + 1);
+    lastAt = at;
+    return new Date(at).toISOString();
   };
   const loadSeenAt = async () => {
     seenAt = Math.max(seenAt, ((await db.get('meta', 'sync'))?.value as SyncState | undefined)?.seenAt ?? 0);
@@ -231,8 +241,8 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
       requireOpen();
       return plain;
     }
-    if (name === 'deckFiles') {
-      // A PDF: encrypted as raw bytes, so the ciphertext is the file's size plus a 16-byte tag
+    if (name === 'deckFiles' || name === 'materialFiles') {
+      // A PDF (or a material's file): encrypted as raw bytes, so the ciphertext is the file's size plus a 16-byte tag
       const aad = recordAad(name, String(plain.id));
       return { id: plain.id, enc: await encryptBytes(key, aad, plain.data as Uint8Array) };
     }
@@ -253,7 +263,7 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
   const open = async <T>(name: RecordStore, stored: unknown): Promise<T> => {
     if (!isSealed(stored)) return stored as T; // plain: before setup, or not yet migrated
     if (!key) throw new StoreError('locked', 'Unlock first.');
-    if (name === 'deckFiles') {
+    if (name === 'deckFiles' || name === 'materialFiles') {
       return { id: stored.id, data: await decryptBytes(key, recordAad(name, String(stored.id)), stored.enc) } as T;
     }
     const secret = await decryptRecord<Row>(key, recordAad(name, String(stored.id)), stored.enc);
@@ -343,6 +353,20 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
     ...planMethods({ db, clock: deps.clock, newId: deps.newId, seal, open, openAll, change, exclusive, requireOpen }),
     // Notes and highlights on slides (#56): src/db/annotations.ts
     ...annotationMethods({ db, clock: deps.clock, newId: deps.newId, seal, open, openAll, change, exclusive, requireOpen }),
+    // Class materials and exam styles (#120): src/db/style.ts
+    ...styleMethods({
+      db,
+      clock: deps.clock,
+      newId: deps.newId,
+      seal,
+      open,
+      openAll,
+      change,
+      exclusive,
+      requireOpen,
+      fileSource: () => fileSource,
+      filesHere: (id) => syncPart.markFilesUp(id),
+    }),
 
     deviceId: () => device,
     status,

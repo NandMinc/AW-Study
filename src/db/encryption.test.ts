@@ -38,7 +38,20 @@ async function writeEverything(store: StudyStore) {
   });
   const lecture = await store.recordLecture({ courseId: course.id, date: '2026-11-16', minutes: 50, sections: [{ deckId: deck.id, firstPage: 1, lastPage: 2 }] });
   await store.addExam({ courseId: course.id, title: `Exam ${MARKER}`, kind: 'midterm', date: '2026-12-01', lectureIds: null });
-  return { course, deck, lecture };
+  // Exam style (#120): a document (PDF and text), the notes and a guide
+  const material = await store.addMaterial({
+    courseId: course.id,
+    title: `Outline ${MARKER}`,
+    fileName: `${MARKER}.pdf`,
+    kind: 'outline',
+    type: 'application/pdf',
+    data: fakePdf(MARKER),
+    pageTexts: [`outline ${MARKER}`],
+  });
+  await store.addMaterial({ courseId: course.id, title: 'Notes', fileName: 'n.txt', kind: 'other', type: 'text/plain', data: new TextEncoder().encode(`text ${MARKER}`), pageTexts: [] });
+  await store.setStyleNotes(course.id, `No proofs ${MARKER}`);
+  await store.saveMadeGuide(course.id, { tests: `Tests ${MARKER}`, levels: [`one ${MARKER}`, 'two', 'three'], shortShare: 0.5 }, { lectureIds: [lecture.lecture.id], materialIds: [material.id], notesAt: null });
+  return { course, deck, lecture, material };
 }
 
 /** Every row of every store, as stored. */
@@ -131,7 +144,7 @@ describe('locking', () => {
   it('refuses everything while locked, with code "locked"', async () => {
     const name = freshName();
     const { store } = await setUpNew(name);
-    const { course, deck, lecture } = await writeEverything(store);
+    const { course, deck, lecture, material } = await writeEverything(store);
     const [exam] = await store.listExams(course.id);
     store.lock();
     expect(store.status()).toBe('locked');
@@ -162,6 +175,16 @@ describe('locking', () => {
       ['changesSince', () => store.changesSince(0)],
       ['exportSealed', () => store.exportSealed()],
       ['addKeyringEntry', async () => store.addKeyringEntry((await store.getKeyring())!.entries[0]!)],
+      ['getExamStyle', () => store.getExamStyle(course.id)],
+      ['setStyleNotes', () => store.setStyleNotes(course.id, 'x')],
+      ['saveMadeGuide', () => store.saveMadeGuide(course.id, { tests: 'x', levels: ['a', 'b', 'c'], shortShare: 0 }, { lectureIds: [], materialIds: [], notesAt: null })],
+      ['editStyleGuide', () => store.editStyleGuide(course.id, { tests: 'x', levels: ['a', 'b', 'c'], shortShare: 0 })],
+      ['listMaterials', () => store.listMaterials(course.id)],
+      ['addMaterial', () => store.addMaterial({ courseId: course.id, title: 'x', fileName: 'x.txt', kind: 'other', type: 'text/plain', data: new Uint8Array([120]), pageTexts: [] })],
+      ['updateMaterial', () => store.updateMaterial(material.id, { title: 'x', kind: 'other' })],
+      ['deleteMaterial', () => store.deleteMaterial(material.id)],
+      ['getMaterialFile', () => store.getMaterialFile(material.id)],
+      ['getMaterialText', () => store.getMaterialText(material.id)],
     ];
     for (const [label, call] of calls) {
       await expect(call(), label).rejects.toMatchObject({ code: 'locked' });

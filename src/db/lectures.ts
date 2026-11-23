@@ -15,7 +15,7 @@ import type {
   Section,
   SlideDeck,
 } from '../types/lecture';
-import type { ChangeRecord, DeckFile, DeckPages, HonedDb, RecordStore } from './schema';
+import { examStyleId, type ChangeRecord, type DeckFile, type DeckPages, type HonedDb, type RecordStore } from './schema';
 import { StoreError } from './store';
 import type { EncryptedRecord } from '../types/crypto';
 
@@ -89,7 +89,7 @@ function checkCourse(input: CourseInput): CourseInput {
   return { name, meetings, termStart, termEnd };
 }
 
-function isPdf(data: Uint8Array): boolean {
+export function isPdf(data: Uint8Array): boolean {
   // Every PDF starts with "%PDF-"
   return data.length >= 5 && data[0] === 0x25 && data[1] === 0x50 && data[2] === 0x44 && data[3] === 0x46 && data[4] === 0x2d;
 }
@@ -254,7 +254,7 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
       exclusive(async () => {
         requireOpen();
         await getCourseOrThrow(id);
-        const [examIds, deckIds, lectureIds, sectionIds, questionIds, attemptIds, sessionIds, annotationIds] = await Promise.all([
+        const [examIds, deckIds, lectureIds, sectionIds, questionIds, attemptIds, sessionIds, annotationIds, materialIds, style] = await Promise.all([
           db.getAllKeysFromIndex('exams', 'byCourse', id),
           db.getAllKeysFromIndex('slideDecks', 'byCourse', id),
           db.getAllKeysFromIndex('lectures', 'byCourse', id),
@@ -263,6 +263,8 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
           db.getAllKeysFromIndex('quizAttempts', 'byCourse', id),
           db.getAllKeysFromIndex('studySessions', 'byCourse', id),
           db.getAllKeysFromIndex('annotations', 'byCourse', id),
+          db.getAllKeysFromIndex('materials', 'byCourse', id),
+          db.get('examStyles', examStyleId(id)),
         ]);
         const deletes = [
           ...questionIds.map((i) => ({ store: 'questions' as const, id: i })),
@@ -277,6 +279,13 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
             { store: 'deckFiles' as const, id: i },
             { store: 'deckPages' as const, id: i },
           ]),
+          // Its other documents and exam style (#120)
+          ...materialIds.flatMap((i) => [
+            { store: 'materials' as const, id: i },
+            { store: 'materialFiles' as const, id: i },
+            { store: 'materialPages' as const, id: i },
+          ]),
+          ...(style ? [{ store: 'examStyles' as const, id: examStyleId(id) }] : []),
           { store: 'courses' as const, id },
         ];
         const logs = await Promise.all([
@@ -288,6 +297,8 @@ export function lectureMethods(ctx: StoreContext): LectureStore {
           ...lectureIds.map((i) => change('lecture', 'delete', i, null)),
           ...examIds.map((i) => change('exam', 'delete', i, null)),
           ...deckIds.map((i) => change('slideDeck', 'delete', i, null)),
+          ...materialIds.map((i) => change('material', 'delete', i, null)),
+          ...(style ? [change('examStyle', 'delete', examStyleId(id), null)] : []),
           change('course', 'delete', id, null),
         ]);
         await write([], deletes, logs);

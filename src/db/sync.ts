@@ -31,6 +31,8 @@ export const ENTITY_STORE: Record<ChangeRecord['entity'], RecordStore> = {
   studySession: 'studySessions',
   settings: 'settings',
   annotation: 'annotations',
+  material: 'materials',
+  examStyle: 'examStyles',
 };
 const ENTITIES = new Set(Object.keys(ENTITY_STORE));
 
@@ -93,15 +95,19 @@ export function syncMethods({ db, key, device, seal, openAll, exclusive, newId, 
     /** Decks whose files are here but not yet on the server (#108). */
     async filesToUpload(): Promise<string[]> {
       const up = new Set(((await db.get('meta', 'syncFiles'))?.value as string[] | undefined) ?? []);
-      return ((await db.getAllKeys('deckFiles')) as string[]).filter((id) => !up.has(id));
+      // Decks' files and class materials' files (#120) travel the same way, by their (unique) ids
+      const ids = [...((await db.getAllKeys('deckFiles')) as string[]), ...((await db.getAllKeys('materialFiles')) as string[])];
+      return ids.filter((id) => !up.has(id));
     },
 
     /** A deck's files as stored here, sealed (nothing is decrypted), to send as they are (#108). */
     async sealedDeckFiles(deckId: string): Promise<{ pdf: EncryptedRecord; pages: EncryptedRecord | null } | null> {
       requireKey();
-      const pdf = (await db.get('deckFiles', deckId)) as { enc?: EncryptedRecord } | undefined;
+      // A deck's, or else a class material's (#120): `pdf` is the file either way, `pages` its text
+      const isDeck = (await db.get('deckFiles', deckId)) !== undefined;
+      const pdf = (await db.get(isDeck ? 'deckFiles' : 'materialFiles', deckId)) as { enc?: EncryptedRecord } | undefined;
       if (!pdf?.enc) return null;
-      const pages = (await db.get('deckPages', deckId)) as { enc?: EncryptedRecord } | undefined;
+      const pages = (await db.get(isDeck ? 'deckPages' : 'materialPages', deckId)) as { enc?: EncryptedRecord } | undefined;
       return { pdf: pdf.enc, pages: pages?.enc ?? null };
     },
 
@@ -200,6 +206,9 @@ export function syncMethods({ db, key, device, seal, openAll, exclusive, newId, 
               ops.push({ kind: 'delete', store, id: c.entityId });
               if (c.entity === 'slideDeck') {
                 ops.push({ kind: 'delete', store: 'deckFiles', id: c.entityId }, { kind: 'delete', store: 'deckPages', id: c.entityId });
+              }
+              if (c.entity === 'material') {
+                ops.push({ kind: 'delete', store: 'materialFiles', id: c.entityId }, { kind: 'delete', store: 'materialPages', id: c.entityId });
               }
             }
             changed++;

@@ -152,6 +152,58 @@ describe('sync between two devices of an account', () => {
     await expect(a.getSlideDeckFile(deck.id)).rejects.toThrow(/no longer exists/);
   });
 
+  it('two edits of one record in the same millisecond reach the other device in order (#120)', async () => {
+    const { a, b } = await pair(); // both clocks stand still
+    const course = await a.createCourse({ name: 'One', meetings: meeting, termStart: null, termEnd: null });
+    await a.updateCourse(course.id, { name: 'Two', meetings: meeting, termStart: null, termEnd: null });
+    await a.updateCourse(course.id, { name: 'Three', meetings: meeting, termStart: null, termEnd: null });
+    await send(a, b);
+    expect((await b.getCourse(course.id))!.name).toBe('Three');
+  });
+
+  it('a class’s exam style and the class itself are separate records: neither’s change hides the other’s (#120)', async () => {
+    const { a, b, clockA, clockB } = await pair();
+    const course = await a.createCourse({ name: 'History', meetings: meeting, termStart: null, termEnd: null });
+    await send(a, b);
+    // A writes the notes; a moment later B renames the class; then each hears from the other
+    clockA.now = new Date('2026-11-20T18:01:00Z');
+    const beforeA = await a.latestSeq();
+    await a.setStyleNotes(course.id, 'Two essays.');
+    clockB.now = new Date('2026-11-20T18:02:00Z');
+    const beforeB = await b.latestSeq();
+    await b.updateCourse(course.id, { name: 'History 2', meetings: meeting, termStart: null, termEnd: null });
+    await send(b, a, beforeB);
+    await send(a, b, beforeA);
+    for (const d of [a, b]) {
+      expect((await d.getCourse(course.id))!.name).toBe('History 2');
+      expect((await d.getExamStyle(course.id)).notes).toBe('Two essays.');
+    }
+  });
+
+  it('a class’s materials and exam style sync like decks (#120): records go, files wait, deletes take files', async () => {
+    const { a, b } = await pair();
+    const course = await a.createCourse({ name: 'History', meetings: meeting, termStart: null, termEnd: null });
+    const material = await a.addMaterial({ courseId: course.id, title: 'Outline', fileName: 'o.pdf', kind: 'outline', type: 'application/pdf', data: fakePdf('o'), pageTexts: ['one'] });
+    await a.setStyleNotes(course.id, 'Two essays.');
+    await a.saveMadeGuide(course.id, { tests: 'Essays on causes.', levels: ['Who?', 'Why then?', 'Explain why.'], shortShare: 0.8 }, { lectureIds: [], materialIds: [material.id], notesAt: null });
+    // Its file is one of the files to upload, sealed as it's stored
+    expect(await a.filesToUpload()).toContain(material.id);
+    expect((await a.sealedDeckFiles(material.id))?.pages).not.toBeNull();
+
+    await send(a, b);
+    expect((await b.listMaterials(course.id)).map((m) => m.title)).toEqual(['Outline']);
+    expect(await b.getExamStyle(course.id)).toEqual(await a.getExamStyle(course.id));
+    await expect(b.getMaterialFile(material.id)).rejects.toThrow(/added on another device/);
+
+    const before = await b.latestSeq();
+    await b.deleteMaterial(material.id);
+    await send(b, a, before);
+    expect(await a.listMaterials(course.id)).toEqual([]);
+    await expect(a.getMaterialFile(material.id)).rejects.toThrow(/no longer exists/);
+    await expect(a.getMaterialText(material.id)).rejects.toThrow(/no longer exists/);
+    expect(await a.filesToUpload()).not.toContain(material.id);
+  });
+
   it('the first device sends its state as one put per record', async () => {
     const { a } = await pair();
     const course = await a.createCourse({ name: 'Chemistry', meetings: meeting, termStart: null, termEnd: null });
