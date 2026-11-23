@@ -122,7 +122,7 @@ describe('questions', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.questions).toHaveLength(2);
-    expect(body.questions[1]).toEqual(goodQuestion(22));
+    expect(body.questions[1]).toEqual({ form: 'choice', level: 2, ...goodQuestion(22) }); // no level in the reply: 2 (#121)
 
     const [call] = calls();
     // Tools off, no MCP, no skills, no saved session, one turn, our model and system prompt
@@ -595,4 +595,152 @@ describe('questions stand on their own (#115)', () => {
     await start([reply({ questions: [{ ...ok, question: 'Describe the diagram on this slide.' }, ok] })]);
     expect((await (await post('written', { pages: SLIDES, count: 1 })).json()).questions).toEqual([ok]);
   });
+});
+
+describe('exam style (#121)', () => {
+  const choice = (level, page = 21, n = 1) => ({ ...goodQuestion(page), question: `Choice question ${n}?`, level });
+  const short = (extra = {}) => ({ form: 'short', level: 3, question: 'Why do atoms share electrons?', points: ['to fill their outer shells'], page: 22, explanation: 'To be stable.', ...extra });
+  const GUIDE = { tests: 'GUIDE-MARKER: mostly worked problems on bonding.', levels: ['Name the bond.', 'Which bond forms between Na and Cl?', 'Explain why water is polar.'], shortShare: 0.4 };
+  const MIX = { choice: [1, 1, 1], short: 1 };
+  const instructions = (prompt) => prompt.slice(0, prompt.indexOf('<<<DATA '));
+  const data = (prompt) => prompt.slice(prompt.indexOf('<<<DATA '));
+
+  it('questions: each keeps its level; short answers come only with a mix that asks for them', async () => {
+    await start([reply({ questions: [choice(1), choice(3, 22, 2), short()] })]);
+    const body = await (await post('questions', { pages: SLIDES, count: 3 })).json();
+    expect(body.questions.map((q) => [q.form, q.level])).toEqual([
+      ['choice', 1],
+      ['choice', 3],
+    ]); // the short one wasn't asked for
+    expect(calls()[0].stdin).toContain('2 (apply): one or two steps of reasoning');
+    expect(calls()[0].stdin).not.toContain('short-answer');
+  });
+
+  it('questions with a mix: the counts in the prompt; short ones always level 3, with 1 to 3 points; extras dropped', async () => {
+    await start([reply({ questions: [short({ level: 2 }), choice(1), choice(2, 21, 2), short({ question: 'An extra short one?' }), choice(3, 22, 3)] })]);
+    const body = await (await post('questions', { pages: SLIDES, count: 4, mix: MIX })).json();
+    expect(body.questions).toEqual([
+      { form: 'short', level: 3, question: 'Why do atoms share electrons?', points: ['to fill their outer shells'], page: 22, explanation: 'To be stable.' },
+      { ...goodQuestion(21), form: 'choice', level: 1, question: 'Choice question 1?' },
+      { ...goodQuestion(21), form: 'choice', level: 2, question: 'Choice question 2?' },
+      { ...goodQuestion(22), form: 'choice', level: 3, question: 'Choice question 3?' },
+    ]);
+    const prompt = calls()[0].stdin;
+    expect(prompt).toContain('1 multiple-choice at level 1, 1 multiple-choice at level 2, 1 multiple-choice at level 3, and 1 short-answer (level 3)');
+    expect(prompt).toContain('at most two sentences');
+  });
+
+  it('questions: a short one with 4 points or a level of 5 is refused (and retried); one pointing at the slides is dropped', async () => {
+    await start([reply({ questions: [short({ points: ['a', 'b', 'c', 'd'] })] }), reply({ questions: [choice(5)] })]);
+    expect((await post('questions', { pages: SLIDES, count: 1, mix: { choice: [0, 0, 0], short: 1 } })).status).toBe(502);
+    expect(calls()).toHaveLength(2);
+    await start([reply({ questions: [short({ points: ['as shown in the figure'] }), short({ question: 'Fine?' })] })]);
+    // Two short ones allowed, so both reach the check: the one pointing at a figure is dropped
+    const body = await (await post('questions', { pages: SLIDES, count: 2, mix: { choice: [0, 0, 0], short: 2 } })).json();
+    expect(body.questions.map((q) => q.question)).toEqual(['Fine?']);
+  });
+
+  it('questions with a guide: it goes in the data block, and the prompt says to write the way it says the exam asks', async () => {
+    await start([reply({ questions: [choice(2)] }), reply({ questions: [choice(2)] })]);
+    await post('questions', { pages: SLIDES, count: 1, guide: GUIDE });
+    await post('questions', { pages: SLIDES, count: 1 });
+    const [withGuide, without] = calls().map((c) => c.stdin);
+    expect(instructions(withGuide)).toContain('exam style guide');
+    expect(data(withGuide)).toContain('GUIDE-MARKER');
+    expect(instructions(withGuide)).not.toContain('GUIDE-MARKER'); // never in the instructions
+    expect(without).not.toContain('exam style guide');
+  });
+
+  const ITEMS = [
+    { question: 'What is a covalent bond?', points: ['atoms share electrons', 'a pair per bond'], answer: 'ANSWER-ONE: they share', page: 21 },
+    { question: 'What is an ionic bond?', points: ['an electron moves'], answer: '', page: 22 },
+  ];
+
+  it('grade-many: one mark per answer, in order, out of its points; the answers only in the data block', async () => {
+    await start([reply({ marks: [{ mark: 1, feedback: 'Say it’s a pair.' }, { mark: 0, feedback: 'No answer.' }] })]);
+    const response = await post('grade-many', { slides: SLIDES, items: ITEMS });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      marks: [
+        { mark: 1, outOf: 2, feedback: 'Say it’s a pair.' },
+        { mark: 0, outOf: 1, feedback: 'No answer.' },
+      ],
+    });
+    const prompt = calls()[0].stdin;
+    expect(instructions(prompt)).not.toContain('ANSWER-ONE');
+    expect(data(prompt)).toContain('ANSWER-ONE');
+    expect(prompt).toContain('exactly one per item (2)');
+    expect(calls()[0].argv.join(' ')).not.toContain('ANSWER-ONE');
+  });
+
+  it('grade-many: the wrong number of marks, or one above its points, is refused (and retried)', async () => {
+    await start([reply({ marks: [{ mark: 1, feedback: 'x' }] }), reply({ marks: [{ mark: 1, feedback: 'x' }, { mark: 2, feedback: 'x' }] })]);
+    expect((await post('grade-many', { slides: SLIDES, items: ITEMS })).status).toBe(502);
+    expect(calls()).toHaveLength(2);
+  });
+
+  const STYLE = {
+    className: 'CHEM 101',
+    notes: 'The prof said: no proofs, two essay questions.',
+    materials: [{ kind: 'past-exam', title: 'Midterm 2025', text: 'MATERIAL-MARKER Q1. Explain why...' }],
+    lectures: [{ date: '2026-11-16', text: 'Covalent bonds: atoms share a pair of electrons.' }],
+  };
+  const madeGuide = { tests: 'Mostly explaining bonding.', levels: ['Name it.', 'Apply it.', 'Explain it.'], shortShare: 0.6 };
+
+  it('style: a guide from the materials, notes and slides, past exams weighed most', async () => {
+    await start([reply(madeGuide)]);
+    const response = await post('style', STYLE);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(madeGuide);
+    const prompt = calls()[0].stdin;
+    expect(prompt).toContain('past exams are the strongest signal');
+    expect(prompt).not.toContain('DATA.previous');
+    expect(instructions(prompt)).not.toContain('MATERIAL-MARKER');
+    expect(data(prompt)).toContain('MATERIAL-MARKER');
+  });
+
+  it('style: a remake improves the guide as it stands, and keeps the student’s edits when there are some', async () => {
+    await start([reply(madeGuide), reply(madeGuide)]);
+    await post('style', { ...STYLE, previous: { ...madeGuide, edited: false } });
+    await post('style', { ...STYLE, previous: { ...madeGuide, edited: true } });
+    const [plain, edited] = calls().map((c) => c.stdin);
+    expect(plain).toContain('improve it');
+    expect(plain).not.toContain('keep their changes');
+    expect(edited).toContain('keep their changes');
+  });
+
+  it('style: a reply without three levels, or a share outside 0 to 1, is refused (and retried)', async () => {
+    await start([reply({ ...madeGuide, levels: ['a', 'b'] }), reply({ ...madeGuide, shortShare: 1.5 })]);
+    expect((await post('style', STYLE)).status).toBe(502);
+    expect(calls()).toHaveLength(2);
+  });
+
+  for (const [name, job, body] of [
+    ['a mix that doesn’t add up to count', 'questions', { pages: SLIDES, count: 3, mix: MIX }],
+    ['a mix without three levels', 'questions', { pages: SLIDES, count: 2, mix: { choice: [1, 1], short: 0 } }],
+    ['a guide with two levels', 'questions', { pages: SLIDES, count: 1, guide: { ...GUIDE, levels: ['a', 'b'] } }],
+    ['a guide with a share of 2', 'questions', { pages: SLIDES, count: 1, guide: { ...GUIDE, shortShare: 2 } }],
+    ['a guide whose tests are too long', 'questions', { pages: SLIDES, count: 1, guide: { ...GUIDE, tests: 'x'.repeat(3_001) } }],
+    ['grade-many with no items', 'grade-many', { slides: SLIDES, items: [] }],
+    ['grade-many with 21 items', 'grade-many', { slides: SLIDES, items: Array.from({ length: 21 }, () => ITEMS[0]) }],
+    ['grade-many about a slide not sent', 'grade-many', { slides: SLIDES, items: [{ ...ITEMS[0], page: 99 }] }],
+    ['grade-many with no points', 'grade-many', { slides: SLIDES, items: [{ ...ITEMS[0], points: [] }] }],
+    ['grade-many with no slides', 'grade-many', { slides: [], items: ITEMS }],
+    ['style with no class name', 'style', { ...STYLE, className: '' }],
+    ['style with nothing to go on', 'style', { className: 'CHEM 101', notes: ' ', materials: [], lectures: [{ date: '2026-11-16', text: '' }] }],
+    ['style with a material of no known kind', 'style', { ...STYLE, materials: [{ ...STYLE.materials[0], kind: 'secret' }] }],
+    ['style with 21 materials', 'style', { ...STYLE, materials: Array.from({ length: 21 }, () => STYLE.materials[0]) }],
+    ['style with a lecture without a date', 'style', { ...STYLE, lectures: [{ date: 'Monday', text: 'x' }] }],
+    ['style with notes too long', 'style', { ...STYLE, notes: 'x'.repeat(4_001) }],
+    ['style with too much text', 'style', { ...STYLE, materials: [{ ...STYLE.materials[0], text: 'x'.repeat(120_001) }] }],
+    ['style with a previous guide not saying whether it was edited', 'style', { ...STYLE, previous: madeGuide }],
+  ]) {
+    it(`refuses ${name} (400), without running Claude Code`, async () => {
+      await start([reply({})]);
+      const response = await post(job, body);
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBeTruthy();
+      expect(calls()).toHaveLength(0);
+    });
+  }
 });

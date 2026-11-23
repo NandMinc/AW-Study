@@ -36,7 +36,9 @@ export function CompareModels({ setting, bank, onAdded, onClose }: { setting: Se
       setResults((r) => ({ ...r, [model.id]: { state: 'running' } }));
       const started = performance.now();
       try {
-        const questions = await ai.makeQuestions({ pages, count: COMPARE_COUNT, model: model.id }, abort.current.signal);
+        // No mix asked for, so all multiple choice (#121); kept so for the side-by-side view
+        const made = await ai.makeQuestions({ pages, count: COMPARE_COUNT, model: model.id }, abort.current.signal);
+        const questions = made.filter((q): q is McQuestion => q.form === 'choice');
         setResults((r) => ({ ...r, [model.id]: { state: 'done', questions, ms: performance.now() - started } }));
       } catch (err) {
         if (err instanceof AiError && err.code === 'cancelled') break;

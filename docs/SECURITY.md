@@ -129,9 +129,12 @@ index needs it; it must not move the other way without changing this table first
 AI is the one time data leaves the device. Everything else in this document is about data at rest.
 
 - **What is sent:** only an AI job's inputs (`src/ai/backend.ts`): to make a section's questions,
-  the text of its slides (never the PDF) and the questions already in its bank; later, a selection or
-  a question from the viewer, or a short answer to grade. Nothing is sent unless the user asks for that
-  job ("Make questions").
+  the text of its slides (never the PDF), the questions already in its bank and the class's exam style
+  guide (#121); later, a selection or a question from the viewer, or short answers to grade (one, or a
+  quiz's in one request). To make a class's exam style guide (#121): the class's name, the student's
+  notes about the exam, the text of its materials (outlines, past exams; never the files) and a sample
+  of its lectures' slide text, cut to fit (`src/ai/style.ts`), with the guide as it stands. Nothing is
+  sent unless the user asks for that job ("Make questions").
 - **Where to:** `/ai/` on our own site only (`connect-src 'self'`), over HTTPS. Cloudflare (its edge
   and Access) and the tunnel carry it to the helper on Nathan's server (`helper/`), which sends it
   to Anthropic through Claude Code, on the asking person's own subscription.

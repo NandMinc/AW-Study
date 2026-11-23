@@ -4,13 +4,14 @@ The shared status board for everyone working on Honed: Matt, Nathan and each one
 **Read it at the start of every session. Update it in every PR** (your task's row, and a line in the
 log). The design is in `DESIGN.md`; how we work together is in `../CLAUDE.md` ("Working together").
 
-## Now (updated Nov 19, 2026)
+## Now (updated Nov 22, 2026)
 
-Milestones 3 to 7 are **done and live** (deployed Nov 19, main 8ee4c61). Now: the **restyle** to
-Matt's and Nathan's design (`docs/design/README.md`, "Building it"; one issue and PR per step: step 1
-#68, step 2 #77, step 3 #75, step 4 #79, step 5 #82 and step 6 #70: **all done**). Then milestone 8 (first run and after-class prompts). Open question
-for Matt and Nathan before 8 starts: are after-class prompts when you next open the app enough for
-now, or do we want real push notifications (DESIGN, "Open questions")?
+Milestones 3 to 7 and 9 are **done** (9, exams, on Nov 22: #86, #87). The restyle is finished, and so are
+accounts and sync (#93-#108). Now: **exam style and question levels** (DESIGN, #117), in five steps:
+storage #120 (Nathan's Claude), helper #121 (Matt's Claude), then the class page #122, the bank and planner
+#123 and the quiz screen #124. Milestone 8 (first run and after-class prompts) waits on a question for Matt
+and Nathan: are after-class prompts when you next open the app enough for now, or do we want real push
+notifications (DESIGN, "Open questions")?
 
 Milestone 3, **Lock it down** (done): encryption, the recovery key, persistent storage, backup and
 restore, in the GitHub milestone "M3: Lock it down".
@@ -63,6 +64,7 @@ slides" and "M6: AI helper and quizzes":
 | AI questions stand on their own (no "this diagram"), with worked problems | #115 | Nathan's Claude | the question prompts and `refersToUnseen` in `helper/jobs.mjs`, `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (this PR). Live once `honed-ai` is updated; banks made before keep their old questions |
 | Design: exam style guide per class, question levels, short answers in quizzes | #117 | Nathan's Claude | `docs/DESIGN.md` ("Exam style and question levels", the Quizzes decision, two open questions) | **Done** (PR #119, Matt's OK); built in #120-#124. Scores weighted by level; "File types to support" list (Nathan, Nov 22) |
 | Exam style 1: contract and storage | #120 | Nathan's Claude | new `src/types/style.ts`; `Level`, `ChoiceQuestion`/`ShortQuestion`, `ShortAnswer`, the weighted score in `src/types/quiz.ts`; `src/db/quiz.ts` (forms, levels, short answers, weighted score); `pickQuiz` multiple choice only for now; then the materials and guide storage in `src/db/` and sync | Contract and quiz storage **this PR**; materials and guide storage next |
+| Exam style 2: helper jobs (`style`, `grade-many`, levels and forms in `questions`) | #121 | Matt's Claude | `helper/jobs.mjs`, `tests/helper/`, `src/ai/` (backend, http, fake, check, new `style.ts`), the filter in `CompareModels.tsx` | **Done** (PR #127). **The helper changed: press Update for `honed-ai`** |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -145,6 +147,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 22 (#121):** The AI helper's exam style jobs. `questions` takes the class's guide and a `mix` (how many
+  at each level, and how many short answers). Every question now comes back with its level (2 when the AI gives
+  none), and short ones with their points. New `grade-many` marks a quiz's short answers in one request, all
+  or nothing; new `style` writes a class's guide. On the device: `checkQuestions` (with the mix),
+  `checkGradeMany`, `checkStyle`, and `styleRequest` (`src/ai/style.ts`), which fits notes, materials and
+  slides into the helper's limits. Nothing calls the new jobs yet (#122-#124). 42 deliberate breaks, all
+  caught. **Press Update for `honed-ai`.**
 
 - **Nov 22 (#87, part 5):** **Exam practice** is built. On the 2 days before an exam, Tasks has a practice row
   that opens `#/practice/<examId>`. The AI writes a short-answer question for each section (`written`); the

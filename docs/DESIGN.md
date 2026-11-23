@@ -265,6 +265,15 @@ Worked out from the section's quiz history each time, like the rest of the plann
   `level` (1-3) and `form` (`choice` or `short`; short ones with 1-3 `points` and no options). The stand-on-its-own
   rule (#115) stays.
 - New jobs: `style` (the guide) and `grade-many` (a quiz's short answers in one request).
+- **Built (#121, Nov 22):** `questions` takes an optional `guide` and `mix` (`{ choice: [level 1, 2, 3], short }`,
+  adding up to `count`). Without a mix it writes multiple choice only, each with a level. Short ones come only
+  as many as the mix asks for, always level 3, with 1 to 3 points and a one-sentence model answer. `grade-many`
+  takes one section's `slides` and up to 20 `items` (question, points, answer, the slide's number). It gives
+  one mark per item, all or nothing, so a mark is never guessed. `style` takes the class's name, notes,
+  materials (each with its kind and text), lectures (date and slide text) and the previous guide with
+  whether it was edited. `styleRequest` in `src/ai/style.ts` fits them into 120,000 characters: the notes
+  whole, the materials next (past exams first, at most 60% of the room), then the latest 60 lectures, each
+  an equal share of what's left.
 - The helper's daily limit (200 requests a person) is plenty: a guide about once a week a class, and one marking
   request per quiz with short answers.
 
