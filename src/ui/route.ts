@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 
 /** The parts of a class's page its menu opens (docs/design "Classes"). */
-export const CLASS_PARTS = ['lectures', 'details', 'exams', 'files'] as const;
+export const CLASS_PARTS = ['lectures', 'details', 'exams', 'files', 'style'] as const;
 export type ClassPart = (typeof CLASS_PARTS)[number];
 
 export type Route =

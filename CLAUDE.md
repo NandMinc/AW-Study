@@ -107,7 +107,8 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   the bank, the quiz, loaded lazily), `ai-context.ts` (the `AiBackend` the screens use: `HttpAiBackend`).
   `MathText` (quiz text with LaTeX between `\(` `\)` or `\[` `\]`, drawn by KaTeX with `trust: false`; never
   `renderToString` into HTML, whose inline styles the CSP blocks; fonts must not be inlined).
-  `update.ts` (when a new version may reload the page: only when locked and idle; never mid-unlock or
+  `ExamStyleSection` + `exam-style.ts` (#122: a class's documents, notes and the AI's exam style guide; `makeGuide`,
+  `shouldRemake`). `update.ts` (when a new version may reload the page: only when locked and idle; never mid-unlock or
   while unlocked, where a banner offers Reload and Lock applies it).
   `bank-jobs.tsx` (making question banks in the background after "What was covered?"; held by App).
   `CompareModels` (the same slides to Haiku, Sonnet and Opus, side by side; the helper allows only those

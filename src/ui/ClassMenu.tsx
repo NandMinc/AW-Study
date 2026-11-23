@@ -1,5 +1,5 @@
 // A class's three-dots menu on the Classes page (docs/design "Classes"): the parts of its page (what
-// lectures covered, the class details, exams, the uploaded files) and deleting the class. A small
+// lectures covered, the class details, exams, the uploaded files, the exam style, #122) and deleting the class. A small
 // list under the button: Escape, a tap outside, or picking an item closes it.
 import { useEffect, useId, useRef, useState } from 'react';
 import { href, type ClassPart } from './route';
@@ -9,6 +9,7 @@ const ITEMS: { part: ClassPart; label: string }[] = [
   { part: 'details', label: 'Class details' },
   { part: 'exams', label: 'Exams' },
   { part: 'files', label: 'Files' },
+  { part: 'style', label: 'Exam style' },
 ];
 
 export function ClassMenu({ courseId, name, onDelete }: { courseId: string; name: string; onDelete: () => void }) {

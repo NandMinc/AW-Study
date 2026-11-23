@@ -198,8 +198,10 @@ made, so new material is studied the way the exam tests it and well-known materi
   3. **The mix:** how much of each level and form suits this class (a recall-only class has few worked problems).
 - Made by a new AI job, **style**, from the class's name, the notes, the materials' text (past exams first, then
   outlines, then the rest, cut to a limit), a sample of the slides (each lecture's text, cut to fit), and the
-  previous guide. Remade when a material or the notes change, and after a new lecture's slides when the guide
-  hasn't seen 2 or more of the class's lectures (one request each time; about once a week for most classes).
+  previous guide. Made or remade on the class page when the student adds, changes or deletes a material or saves
+  the notes; and before a section's questions are made when the guide hasn't seen 2 or more of the class's lectures
+  (#123). **Opening a class never sends anything** (#122): slides alone are sent only when questions are made, which
+  the student can turn off. One request each time; about once a week for most classes.
 - The student can **read and edit** it. Once edited, a remake gets the edited version as its previous guide and is
   told to keep the student's changes. **Remake** is a button.
 - Every questions request sends the guide with the slides. Exam practice uses it too.

@@ -13,6 +13,7 @@ import { describeMeetings, formatDate, latestLecture, lectureMinutesOn, orderSec
 import { ClassEditor } from './ClassEditor';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ExamEditor, KIND_NAMES } from './ExamEditor';
+import { ExamStyleSection } from './ExamStyleSection';
 import { LectureForm } from './LectureForm';
 import { PdfProblem, readPdfFile } from './pdf-file';
 import { go, href, type ClassPart } from './route';
@@ -310,6 +311,11 @@ export function ClassScreen({ courseId, part, cover }: { courseId: string; part?
         {uploading ? 'Adding the slides…' : 'Add slides (PDF)'}
         <input type="file" accept="application/pdf,.pdf" disabled={uploading} onChange={(e) => void upload(e.target.files?.[0]).then(() => (e.target.value = ''))} />
       </label>
+
+      <h3 id="class-style" tabIndex={-1}>
+        Exam style
+      </h3>
+      <ExamStyleSection courseId={courseId} lectures={lectures.map((l) => l.lecture.id).join(' ')} />
 
       {deleting && (
         <ConfirmDialog

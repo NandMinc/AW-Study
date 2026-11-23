@@ -58,6 +58,7 @@ describe('parseRoute', () => {
       { name: 'class', courseId: 'c1' },
       { name: 'class', courseId: 'c1', part: 'lectures' },
       { name: 'class', courseId: 'c1', part: 'files' },
+      { name: 'class', courseId: 'c1', part: 'style' }, // #122
       { name: 'class', courseId: 'c1', cover: '2026-11-15' },
       { name: 'slides', courseId: 'c1', deckId: 'd1' },
       { name: 'slides', courseId: 'c1', deckId: 'd1', first: 2, last: 4 },

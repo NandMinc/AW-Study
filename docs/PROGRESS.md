@@ -64,6 +64,7 @@ slides" and "M6: AI helper and quizzes":
 | AI questions stand on their own (no "this diagram"), with worked problems | #115 | Nathan's Claude | the question prompts and `refersToUnseen` in `helper/jobs.mjs`, `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (this PR). Live once `honed-ai` is updated; banks made before keep their old questions |
 | Design: exam style guide per class, question levels, short answers in quizzes | #117 | Nathan's Claude | `docs/DESIGN.md` ("Exam style and question levels", the Quizzes decision, two open questions) | **Done** (PR #119, Matt's OK); built in #120-#124. Scores weighted by level; "File types to support" list (Nathan, Nov 22) |
 | Exam style 1: contract and storage | #120 | Nathan's Claude | new `src/types/style.ts`; `Level`, `ChoiceQuestion`/`ShortQuestion`, `ShortAnswer`, the weighted score in `src/types/quiz.ts`; `src/db/quiz.ts` (forms, levels, short answers, weighted score); `pickQuiz` multiple choice only for now; then the materials and guide storage in `src/db/` and sync | Contract and quiz storage **done** (PR #126); materials and guide storage **this PR** (schema step 9, `src/db/style.ts`, sync incl. the sync server) |
+| Exam style 3: the class page's Exam style | #122 | Nathan's Claude | new `src/ui/ExamStyleSection.tsx`, `src/ui/exam-style.ts` (+ test), the `style` part in `route.ts` and `ClassMenu.tsx`, one block of `ClassScreen.tsx`, a small block at the end of `src/app.css`, `tests/browsers/exam-style.spec.ts` | **Done** (this PR) |
 | Exam style 2: helper jobs (`style`, `grade-many`, levels and forms in `questions`) | #121 | Matt's Claude | `helper/jobs.mjs`, `tests/helper/`, `src/ai/` (backend, http, fake, check, new `style.ts`), the filter in `CompareModels.tsx` | **Done** (PR #127). **The helper changed: press Update for `honed-ai`** |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
@@ -148,6 +149,14 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 22 (#122):** The class page's **Exam style** (its menu's new "Exam style"): documents (PDF or text; the kind guessed from
+  the file name, changeable; .docx refused with a message), the notes, and the guide (what the exam tests, the three levels, the
+  short-answer share, what it was made from), with Edit and Remake. Written or remade by itself only after the student changes a
+  document or the notes (`remakeOnPage`), at most once per change (a failure isn't retried in a loop; the sign-in link shows).
+  **Opening a class sends nothing** (a first version sent the slides on opening, even with question making turned off: the existing
+  "turned off, nothing is sent" test caught it). Only the slides each lecture covered are sent. For #123: `makeGuide(store, ai,
+  courseId)` and `shouldRemake` (2+ new lectures) in `src/ui/exam-style.ts`; the bank doesn't send the guide yet. 8 deliberate breaks,
+  all caught.
 - **Nov 22 (#121):** The AI helper's exam style jobs. `questions` takes the class's guide and a `mix` (how many
   at each level, and how many short answers). Every question now comes back with its level (2 when the AI gives
   none), and short ones with their points. New `grade-many` marks a quiz's short answers in one request, all
