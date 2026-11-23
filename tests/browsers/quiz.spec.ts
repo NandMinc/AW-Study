@@ -286,8 +286,16 @@ test('locking stops the background work: a late answer writes nothing', async ({
     answered = true;
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ questions }) }).catch(() => {});
   });
+  // Making questions brings the class's guide up to date first (#123). Here that step is slow, as under load, and the
+  // test locks only once the questions request is out, so it's that request's late answer being tested (#139)
+  await page.route('**/ai/style', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await route.fallback();
+  });
+  const questionsAsked = page.waitForRequest('**/ai/questions');
   await classWithLecture(page, { makeQuestions: true });
   await expect(page.getByTestId('bank-jobs')).toContainText('Making quiz questions');
+  await questionsAsked;
   await page.getByRole('button', { name: 'Lock', exact: true }).click();
   release();
   await expect.poll(() => answered).toBe(true);
