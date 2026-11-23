@@ -1,13 +1,13 @@
 // The bug button (#141, public/bugreport.js): off for everyone, on after ?bugs=on or Settings' switch; it takes
-// a picture of the screen, asks for a note and sends both to Nathan's admin site. The test answers for the admin
-// site itself: nothing is sent anywhere.
+// a picture of the screen, asks for a note and sends both to Nathan's bug server (bugs.pacificfish.ca). The test
+// answers for that server itself: nothing is sent anywhere.
 import { expect, test, type Page } from './fixtures';
 import { navBar, watchProblems } from './class-helpers';
 import { openUnlocked } from './lock-helpers';
 
 test.use({ serviceWorkers: 'block' }); // Playwright's routing doesn't see a service worker's requests
 
-const ENDPOINT = 'https://admin.pacificfish.ca/api/bugs';
+const ENDPOINT = 'https://bugs.pacificfish.ca/api/bugs';
 type Sent = { type: string; extra?: string; body: { app: string; note: string; image: string | null } };
 
 async function fakeAdmin(page: Page, base: string) {
@@ -65,4 +65,25 @@ test('Settings turns the bug button on and off on this device', async ({ page })
   await page.getByRole('button', { name: 'Turn off the bug button' }).click();
   await expect(page.getByRole('heading', { name: /^Unlock/ })).toBeVisible();
   await expect(page.locator('.bugreport-button')).toHaveCount(0);
+});
+
+test('not signed in for bug reports yet: the report is kept and the box offers a sign-in that comes back', async ({ page, baseURL }) => {
+  await page.route(ENDPOINT, (route) =>
+    route.fulfill({
+      status: 403,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'This browser isn’t signed in to send bug reports' }),
+      headers: { 'Access-Control-Allow-Origin': baseURL!, 'Access-Control-Allow-Credentials': 'true' },
+    }),
+  );
+  await page.goto('/?bugs=on');
+  await openUnlocked(page);
+  await page.locator('button.bugreport-button').click();
+  const box = page.locator('dialog.bugreport-box');
+  await box.getByRole('textbox', { name: 'Note' }).fill('send me later');
+  await box.getByRole('button', { name: 'Save' }).click();
+  await expect(box.getByText('kept on this device')).toBeVisible();
+  await expect(box.getByText('isn’t signed in to send bug reports')).toBeVisible();
+  const link = box.getByRole('link', { name: 'Sign in to send' });
+  await expect(link).toHaveAttribute('href', `https://bugs.pacificfish.ca/signin?then=${encodeURIComponent(page.url())}`);
 });

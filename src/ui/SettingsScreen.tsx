@@ -363,8 +363,8 @@ function BugButtonSetting() {
         <span>
           {on ? 'On on this device.' : 'Off on this device.'}{' '}
           <span className="muted small">
-            A round button that saves a picture of the screen and a note to Nathan’s bug reports. Only works when signed in
-            to admin.pacificfish.ca.
+            A round button that saves a picture of the screen and a note to Nathan’s bug reports. The first time, it asks
+            you to sign in with Google (Nathan and Matt only).
           </span>
         </span>
         <button type="button" onClick={flip}>
