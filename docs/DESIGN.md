@@ -448,6 +448,13 @@ Tick a question once Matt and Nathan agree, and write the answer under it.
 
 - [x] **After-class prompts:** a real notification on your phone needs the server to send pushes (and to know your class times). For the prototype, is asking *when you next open the app* enough, with push later?
     - Matt (Nov 22): yes, a popup when Honed opens, linking to the lecture to fill in (#129). Push maybe later.
+    - **Built (#129):** on Tasks, Classes or Settings (never over a quiz, Play or the slides), when the app opens or
+      comes back into view, a popup lists the lectures that have **ended** (start + length) in the **last 7 days**,
+      **since the class was added** (older ones are the Classes page's date buttons already), within the term and not
+      filled in, newest first, four at most (then "And N more on the Classes page"). Each links to its "What was
+      covered?". **Later** (or Escape, or a tap outside) puts them off until tomorrow; following a link counts as seen
+      for today too, so cancelling the form doesn't bring the popup straight back. What's put off is kept on the
+      device (localStorage), not in the encrypted store: it's only class ids and dates for today.
 - [ ] **Motivation:** the first design had a daily ring, streaks and combos. Keep those ideas for the checklist and Play (e.g. the ring fills as today's list gets done), or leave them for later with leaderboards?
 - [ ] **Default daily minutes:** 60? And should some classes get more of the time than others (e.g. a weight per class)?
     - For now (Nov 18, #47): 60, changed in Settings. No weights per class yet.

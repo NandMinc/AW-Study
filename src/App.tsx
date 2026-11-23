@@ -8,6 +8,7 @@ import { ClassesScreen } from './ui/ClassesScreen';
 import { ClassScreen } from './ui/ClassScreen';
 import { VaultContext } from './ui/lock-parts';
 import { mainPage, NavBar } from './ui/NavBar';
+import { AfterClass } from './ui/AfterClass';
 import { go, href, useRoute } from './ui/route';
 import { DAY_START_HOUR } from './ui/settings';
 import { SettingsScreen } from './ui/SettingsScreen';
@@ -28,8 +29,8 @@ const PracticeScreen = lazy(() => import('./ui/PracticeScreen'));
 
 // The page frame: the name (back to Tasks, the home page) and Lock, the current screen, a footer with
 // today's study day and whether the app is ready to work offline, and on the three main pages (Tasks,
-// Classes, Settings) the nav bar. Until the app is unlocked, the only screen is setup (first run) or
-// unlock.
+// Classes, Settings) the nav bar and the after-class reminder (#129). Until the app is unlocked, the only
+// screen is setup (first run) or unlock.
 export default function App({ store, vault }: { store: StudyStore; vault: Vault }) {
   const route = useRoute();
   // Bumped when another device's changes arrive (#105), so the pages that list things load again
@@ -82,6 +83,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
           {status === 'unlocked' && <BankJobsStatus />}
           {status === 'unlocked' && <SyncRunner onChanged={() => setDataVersion((v) => v + 1)} />}
           {status === 'unlocked' && <Screen route={route} onLock={lock} dataVersion={dataVersion} onReplaced={() => setDataVersion((v) => v + 1)} />}
+          {page && <AfterClass page={page} />}
         </main>
         <Footer wide={wide} slidesPage={slidesPage} nav={page !== null} />
         {page && <NavBar current={page} />}
