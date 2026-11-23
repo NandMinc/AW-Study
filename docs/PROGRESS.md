@@ -9,8 +9,7 @@ log). The design is in `DESIGN.md`; how we work together is in `../CLAUDE.md` ("
 Milestones 3 to 7 and 9 are **done** (9, exams, on Nov 22: #86, #87). The restyle is finished, and so are
 accounts and sync (#93-#108). Now: **exam style and question levels** (DESIGN, #117), in five steps:
 contract and storage #120, the helper #121 and the class page #122 are **done**; next the bank and planner
-#123, and the quiz screen #124. Milestone 8 (first run and after-class prompts): the after-class reminder is **done** (#129); the first-run
-tutorial isn't started.
+#123, and the quiz screen #124. Milestone 8 (first run and after-class prompts) is **done** (#129, #136).
 
 Milestone 3, **Lock it down** (done): encryption, the recovery key, persistent storage, backup and
 restore, in the GitHub milestone "M3: Lock it down".
@@ -67,6 +66,7 @@ slides" and "M6: AI helper and quizzes":
 | Exam style 2: helper jobs (`style`, `grade-many`, levels and forms in `questions`) | #121 | Matt's Claude | `helper/jobs.mjs`, `tests/helper/`, `src/ai/` (backend, http, fake, check, new `style.ts`), the filter in `CompareModels.tsx` | **Done** (PR #127). **The helper changed: press Update for `honed-ai`** |
 | Exam style 3: the class page's Exam style (documents, notes, the guide) | #122 | Matt's Claude | new `src/ui/ExamStyleSection.tsx`, `src/quiz/guide.ts`, `readMaterialFile` in `src/ui/pdf-file.ts`, the `style` part in `route.ts` and `ClassMenu.tsx`, its place in `ClassScreen.tsx`, the exam style styles, `tests/browsers/exam-style.spec.ts` | **Done** (PR #130) |
 | After-class reminder: a popup when Honed opens links to the lecture to fill in | #129 | Matt's Claude | new `src/ui/AfterClass.tsx` and `src/ui/after-class.ts` (+ tests), its place in `src/App.tsx`, `tests/browsers/after-class.spec.ts` | **Done** (PR #132). Try on a real phone after deploy |
+| First-run tutorial: a short tour, then Getting started on Tasks | #136 | Matt's Claude | new `src/ui/GettingStarted.tsx` and `src/ui/getting-started.ts` (+ tests), `start` in `planning.ts`, its place in `TasksScreen.tsx`, `#/tour` and `#/classes/new` (`route.ts`, `App.tsx`, `ClassesScreen.tsx`), Help in `SettingsScreen.tsx`, the `storageState` in `playwright.config.ts`, `tests/browsers/first-run.spec.ts` | **Done** (PR #137). Milestone 8 is done |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -80,7 +80,7 @@ slides" and "M6: AI helper and quizzes":
 | 5 | Planner and the daily checklist with Play | **Done** (#47); exams pulling sections forward come with 9 |
 | 6 | AI helper and quizzes | **Helper live** (#27); question banks and quizzes **done** (#40); scores moving the schedule waits for 5 |
 | 7 | Viewer tools: highlights, notes, explain, ask | **Done** (#56); not yet tried on a real phone |
-| 8 | First run (tutorial) and after-class prompts | Not started |
+| 8 | First run (tutorial) and after-class prompts | **Done** (#129, #136); not yet tried on a real phone |
 | 9 | Exams: pulling forward, practice tests with AI-graded short answers | **Done** (#86, #87); not yet tried on a real phone |
 
 ## Live
@@ -149,6 +149,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 23 (#136):** **The first run.** After setup, a three-card tour of the main ideas (once, for someone with no
+  classes; again from Settings > Help), then **Getting started** on Tasks: add a class, add what a lecture covered,
+  do a first study session or quiz, each ticking itself from the data and linking to where to do it, gone when all
+  are done or skipped. Every other browser test starts as if the tour was seen and the checklist skipped
+  (`storageState` in `playwright.config.ts`; `first-run.spec.ts` starts without), as the helpers untick "Remember
+  this device": otherwise the tour would stand in front of every test. 14 deliberate breaks, all caught.
+  **Milestone 8 is done** (with #129).
 
 - **Nov 22 (#129):** **After-class reminder.** When Honed opens or comes back into view on Tasks, Classes or Settings,
   a popup lists lectures that have ended in the last 7 days since the class was added and aren't filled in, each
@@ -580,6 +588,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- **Browser tests start past the first run** (#136): `playwright.config.ts` gives every test's context localStorage
+  saying the tour was seen and Getting started skipped (for 127.0.0.1 and localhost). A test that makes its own
+  context with `browser.newContext()` doesn't get it, so the tour opens there: pass the same `storageState`.
 - **A popup's Escape key: add the listener in `useLayoutEffect`, not `useEffect`** (#129). `useEffect` runs after the
   browser paints, so a test (or a quick person) can see the popup and press Escape before the listener exists.
   WebKit lost it 5 runs in 8. The listener is added once while the popup is open, reading the current handler

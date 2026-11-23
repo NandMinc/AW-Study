@@ -1,20 +1,23 @@
 // The Tasks page (#/, the home page; docs/design/README.md "Tasks", #77): today's work by class, in
 // the order the user drags them into, from src/plan/tasks.ts. A progress bar, Start (Play, in this
 // order), and a row per class that opens to its lectures, each with its slides and its quiz. No times
-// are shown (the daily minutes are in Settings). Nothing today: the penguin. Exam practice (#87) is a
+// are shown (the daily minutes are in Settings). Nothing today: the penguin. A new user also gets the
+// first-run tour and Getting started (#136). Exam practice (#87) is a
 // row of its own above the classes, on the 2 days before an exam.
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { APP_NAME } from '../brand';
 import { daysBetween } from '../plan/planner';
 import { STATUS_TEXT, type ClassTasks, type TaskItem } from '../plan/tasks';
 import type { Exam } from '../types/lecture';
+import { GettingStarted } from './GettingStarted';
 import { Penguin } from './Penguin';
 import { loadPlanning, type ItemPlace } from './planning';
 import { href } from './route';
 import { useStore } from './store-context';
 import { messageOf, useLoad } from './useLoad';
 
-export function TasksScreen() {
+/** `tour`: opened at the first-run tour (#/tour, from Settings; #136). */
+export function TasksScreen({ tour = false }: { tour?: boolean }) {
   const store = useStore();
   const { data, error } = useLoad(() => loadPlanning(store), [store]);
   const [order, setOrder] = useState<string[]>([]);
@@ -117,6 +120,7 @@ export function TasksScreen() {
       <h2 id="tasks-title" className="page-title">
         Tasks
       </h2>
+      <GettingStarted start={data.start} tour={tour} />
       {classes.length === 0 ? (
         <div className="tasks-empty">
           {practice}

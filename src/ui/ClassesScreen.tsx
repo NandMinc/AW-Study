@@ -19,7 +19,8 @@ interface ClassData {
   toFill: { date: string; minutes: number }[];
 }
 
-export function ClassesScreen() {
+/** `adding`: opened at adding a class (#/classes/new, from Getting started, #136). */
+export function ClassesScreen({ adding: startAdding = false }: { adding?: boolean }) {
   const store = useStore();
   const now = new Date();
   const zone = deviceTimeZone();
@@ -34,7 +35,7 @@ export function ClassesScreen() {
       }),
     );
   }, [store, today]);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(startAdding);
   const [deleting, setDeleting] = useState<CourseSummary | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -97,7 +98,7 @@ export function ClassesScreen() {
       </ul>
 
       {adding ? (
-        <ClassEditor onCancel={() => setAdding(false)} onSaved={(course) => go({ name: 'class', courseId: course.id })} />
+        <ClassEditor onCancel={() => (setAdding(false), startAdding && go({ name: 'classes' }))} onSaved={(course) => go({ name: 'class', courseId: course.id })} />
       ) : (
         <div className="add-class">
           <button type="button" className={data.length === 0 ? 'round primary' : 'round'} aria-label="Add a class" onClick={() => setAdding(true)}>

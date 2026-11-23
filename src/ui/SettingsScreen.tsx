@@ -10,6 +10,7 @@ import { GoogleUnlockSettings } from '../sync/GoogleUnlockSettings';
 import { SyncSettings } from '../sync/SyncSettings';
 import { AiSettings } from './AiSettings';
 import { ThisDevice } from './ThisDevice';
+import { href } from './route';
 import { APP_NAME } from '../brand';
 import { DAILY_MINUTES_MAX, DAILY_MINUTES_MIN } from '../db/plan';
 import { newRecoveryKey, wrapWithPasskey, wrapWithPassphrase, wrapWithRecoveryKey } from '../lib/crypto';
@@ -152,6 +153,11 @@ export function SettingsScreen({ onLock, onReplaced = () => {} }: { onLock: () =
       <BackupSettings store={store} onRestored={() => void reload()} />
 
       <ThisDevice onLock={onLock} />
+
+      <h3>Help</h3>
+      <p>
+        <a href={href({ name: 'tasks', tour: true })}>How {APP_NAME} works</a> <span className="muted small">(the short tour from the first run)</span>
+      </p>
 
       {removing && (
         <ConfirmDialog

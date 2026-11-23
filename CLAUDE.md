@@ -113,7 +113,8 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   the bank, the quiz, loaded lazily), `ai-context.ts` (the `AiBackend` the screens use: `HttpAiBackend`).
   `MathText` (quiz text with LaTeX between `\(` `\)` or `\[` `\]`, drawn by KaTeX with `trust: false`; never
   `renderToString` into HTML, whose inline styles the CSP blocks; fonts must not be inlined).
-  `AfterClass` and `after-class.ts` (#129: the popup when Honed opens after a lecture, linking to "What was
+  `GettingStarted` and `getting-started.ts` (#136: the first-run tour and the Getting started checklist on Tasks;
+  every browser test starts past them, `playwright.config.ts`). `AfterClass` and `after-class.ts` (#129: the popup when Honed opens after a lecture, linking to "What was
   covered?"; Later is kept in localStorage). `update.ts` (when a new version may reload the page: only when locked and idle; never mid-unlock or
   while unlocked, where a banner offers Reload and Lock applies it).
   `bank-jobs.tsx` (making question banks in the background after "What was covered?"; held by App).
