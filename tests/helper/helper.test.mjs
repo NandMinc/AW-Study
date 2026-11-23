@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { accessChecker } from '../../helper/access.mjs';
 import { createHelper, MAX_BODY, peopleFromEnv, returnPath } from '../../helper/app.mjs';
 import { claudeArgs } from '../../helper/claude.mjs';
-import { buildPrompt } from '../../helper/jobs.mjs';
+import { buildPrompt, refersToUnseen } from '../../helper/jobs.mjs';
 
 const TEAM = 'https://honed-test.cloudflareaccess.com';
 const AUD = 'aud-tag-123';
@@ -528,5 +528,71 @@ describe('which slides get questions', () => {
     const prompt = calls()[0].stdin;
     for (const kind of ['title', 'agenda or contents', 'section dividers', '"thank you"', 'references']) expect(prompt).toContain(kind);
     expect(prompt).toContain('put those questions on the other slides instead');
+  });
+});
+
+describe('questions stand on their own (#115)', () => {
+  it('both question prompts say an expert who never saw the slides must score perfectly, and ask for worked problems', async () => {
+    await start([reply({ questions: [goodQuestion()] }), reply({ questions: [{ question: 'Why do covalent bonds form?', points: ['p'], page: 21 }] })]);
+    await post('questions', { pages: SLIDES, count: 1 });
+    await post('written', { pages: SLIDES, count: 1 });
+    for (const { stdin } of calls()) {
+      const instructions = stdin.slice(0, stdin.indexOf('<<<DATA'));
+      expect(instructions).toContain('an expert on the subject who has never seen these slides must be able to answer it perfectly');
+      expect(instructions).toContain('never refer to the slides');
+      expect(instructions).toContain('include worked problems');
+    }
+  });
+
+  it('spots questions that point at things the student can’t see, but not ordinary subject words', () => {
+    for (const text of [
+      'In this diagram, what is x?',
+      'What does the figure show?',
+      'According to the slide, which is true?',
+      'Which value is shown above?',
+      'What does slide 4 define?',
+      'What did the lecture say about bonds?',
+      'In the following chart, which bar is tallest?',
+      'What does this image show?',
+    ]) expect(refersToUnseen(text), text).toBe(true);
+    for (const text of [
+      'Which element is in group 1 of the periodic table?',
+      'In a Venn diagram of A and B, what is A ∩ B?',
+      String.raw`Solve \(2x + 3 = 11\) for \(x\).`,
+      'What is a free-body diagram used for?',
+      String.raw`What is the image of 2 under \(f(x) = x^2\)?`,
+      'Which picture of the atom did Bohr propose?',
+    ]) expect(refersToUnseen(text), text).toBe(false);
+  });
+
+  it('drops such a question, keeps the rest, and fills up from extra ones', async () => {
+    const pointing = { ...goodQuestion(), question: 'In this diagram, what is x?' };
+    const worked = { ...goodQuestion(22), question: String.raw`Solve \(2x + 3 = 11\) for \(x\).`, options: ['4', '7', '5.5', '8'] };
+    await start([reply({ questions: [pointing, goodQuestion(), worked] })]);
+    const body = await (await post('questions', { pages: SLIDES, count: 2 })).json();
+    expect(body.questions.map((q) => q.question)).toEqual([goodQuestion().question, worked.question]);
+    expect(calls()).toHaveLength(1);
+  });
+
+  it('an option pointing at the slides counts too', async () => {
+    await start([reply({ questions: [{ ...goodQuestion(), options: ['As shown in the figure', 'b', 'c', 'd'] }, goodQuestion(22)] })]);
+    const body = await (await post('questions', { pages: SLIDES, count: 2 })).json();
+    expect(body.questions).toHaveLength(1);
+    expect(body.questions[0].page).toBe(22);
+  });
+
+  it('retries when every question points at the slides', async () => {
+    await start([
+      reply({ questions: [{ ...goodQuestion(), question: 'What does slide 21 say?' }] }),
+      reply({ questions: [{ question: 'Explain the figure.', points: ['p'], page: 21 }] }),
+    ]);
+    expect((await post('questions', { pages: SLIDES, count: 1 })).status).toBe(502);
+    expect(calls()).toHaveLength(2);
+  });
+
+  it('written: a short-answer question pointing at the slides is dropped', async () => {
+    const ok = { question: 'Why do covalent bonds form?', points: ['atoms share electrons'], page: 21 };
+    await start([reply({ questions: [{ ...ok, question: 'Describe the diagram on this slide.' }, ok] })]);
+    expect((await (await post('written', { pages: SLIDES, count: 1 })).json()).questions).toEqual([ok]);
   });
 });

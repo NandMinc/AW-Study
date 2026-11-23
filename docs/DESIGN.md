@@ -202,6 +202,8 @@ The AI runs as **Claude Code on Nathan's home server**, inside a locked-down hel
 | Explain this | In the viewer | The selection and the slide (plus neighbours) | A short explanation |
 | Ask about this | In the viewer | The same, plus your question | An answer |
 
+**Questions stand on their own** (#115): the student sees only the question, never the slide, and the AI only gets each slide's text, never its pictures. So a question never refers to the slides, the lecture or a diagram it doesn't write out: an expert on the subject who has never seen these slides must be able to score perfectly. Where the material can be worked through (maths, physics, code...), some questions are worked problems ("Solve ...") whose wrong options are the answers common mistakes give. The helper drops questions that still point at the slides. The slide number stays, for "see the slide" after answering.
+
 Multiple-choice quizzes need **no AI at the moment you take them**: the bank was made earlier, so quizzes work offline and cost nothing.
 
 **How a request travels**
