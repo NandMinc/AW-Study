@@ -13,6 +13,8 @@ import {
   type GradeRequest,
   type MadeQuestion,
   type MakeQuestionsRequest,
+  type PageReadingResult,
+  type ReadPageRequest,
   type StyleRequest,
   type WrittenQuestion,
   type WrittenRequest,
@@ -26,7 +28,8 @@ export type FakeCall =
   | { job: 'gradeMany'; request: GradeManyRequest }
   | { job: 'makeStyleGuide'; request: StyleRequest }
   | { job: 'explain'; request: ExplainRequest }
-  | { job: 'ask'; request: AskRequest };
+  | { job: 'ask'; request: AskRequest }
+  | { job: 'readPage'; request: ReadPageRequest };
 
 export class FakeAiBackend implements AiBackend {
   readonly calls: FakeCall[] = [];
@@ -110,6 +113,11 @@ export class FakeAiBackend implements AiBackend {
   async ask(request: AskRequest) {
     this.record({ job: 'ask', request });
     return `An answer to “${request.question}”.`;
+  }
+
+  async readPage(request: ReadPageRequest): Promise<PageReadingResult> {
+    this.record({ job: 'readPage', request });
+    return { model: 'claude-haiku-5-5', reading: { pictureText: 'Words from the picture.', figures: [{ label: 'Figure 1', description: 'A fake figure.' }], kinds: ['diagram'], decorativeOnly: false } };
   }
 
   private record(call: FakeCall) {

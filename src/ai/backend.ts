@@ -1,3 +1,4 @@
+import type { ReadingKind } from '../types/reading';
 // AI in the app: every AI job goes through `AiBackend` (CLAUDE.md, "AI"). The real one,
 // HttpAiBackend, calls our AI helper at /ai/ on this same site (helper/, #27), behind Cloudflare
 // Access. Tests and development use FakeAiBackend (./fake.ts), so nothing is spent or sent.
@@ -111,12 +112,26 @@ export interface Grade {
 export interface ExplainRequest {
   selection: string;
   slides: SlideText[]; // the slide and its neighbours
+  /** A box's picture (#175): the boxed part of the slide, as a PNG. The selection may then be empty. */
+  image?: Uint8Array;
 }
 
 export interface AskRequest {
   question: string;
   selection?: string;
   slides: SlideText[];
+  /** A box's picture (#175). */
+  image?: Uint8Array;
+}
+
+/** A page read now (#175): its picture (PNG) and text in, what the AI read on it out. */
+export interface ReadPageRequest {
+  text: string;
+  image: Uint8Array;
+}
+export interface PageReadingResult {
+  model: string;
+  reading: { pictureText: string; figures: { label: string; description: string }[]; kinds: ReadingKind[]; decorativeOnly: boolean };
 }
 
 /** Who the helper sees you as and today's use (its GET /ai/whoami), for Settings. Uses no AI. */
@@ -139,6 +154,8 @@ export interface AiBackend {
   makeStyleGuide(request: StyleRequest, signal?: AbortSignal): Promise<StyleGuideContent>;
   explain(request: ExplainRequest, signal?: AbortSignal): Promise<string>;
   ask(request: AskRequest, signal?: AbortSignal): Promise<string>;
+  /** Reads one page now (#175): Explain or Ask on a page the batch hasn't read yet. */
+  readPage(request: ReadPageRequest, signal?: AbortSignal): Promise<PageReadingResult>;
 }
 
 export type AiErrorCode =

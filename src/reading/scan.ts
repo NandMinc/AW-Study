@@ -142,3 +142,40 @@ async function toPng(canvas: HTMLCanvasElement): Promise<Uint8Array> {
   if (!blob) throw new Error('This browser couldn’t draw the page as a picture.');
   return new Uint8Array(await blob.arrayBuffer());
 }
+
+/** A box on a page (fractions of the page, from its top left), as in src/types/annotation.ts. */
+export interface AreaRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * A box's area of a page as a PNG (#175): what the student boxed, for Explain and Ask. Drawn so the box is about
+ * `longEdge` pixels on its long edge (sharp enough to read small print), at most 4 times the page's size.
+ */
+export async function drawAreaPng(doc: PDFDocumentProxy, n: number, area: AreaRect, longEdge = 1000): Promise<Uint8Array> {
+  if (!Number.isInteger(n) || n < 1 || n > doc.numPages) throw new RangeError(`No page ${n} in this deck.`);
+  const page = await doc.getPage(n);
+  try {
+    const base = page.getViewport({ scale: 1 });
+    const boxW = Math.max(area.w * base.width, 1);
+    const boxH = Math.max(area.h * base.height, 1);
+    const scale = Math.min(4, longEdge / Math.max(boxW, boxH));
+    const viewport = page.getViewport({ scale });
+    const factory = (doc as unknown as { canvasFactory: CanvasFactory }).canvasFactory;
+    const full = factory.create(Math.max(1, Math.round(viewport.width)), Math.max(1, Math.round(viewport.height)));
+    const cut = factory.create(Math.max(1, Math.round(boxW * scale)), Math.max(1, Math.round(boxH * scale)));
+    try {
+      await page.render({ canvas: full.canvas, canvasContext: full.context, viewport, background: 'white' }).promise;
+      cut.context.drawImage(full.canvas, -Math.round(area.x * viewport.width), -Math.round(area.y * viewport.height));
+      return await toPng(cut.canvas);
+    } finally {
+      factory.destroy(full);
+      factory.destroy(cut);
+    }
+  } finally {
+    page.cleanup();
+  }
+}

@@ -5,7 +5,7 @@
 // When the Access sign-in has lapsed, Access answers with a redirect to its sign-in page (on
 // another site). We never follow it (`redirect: 'manual'`): the fetch sees an "opaque redirect",
 // and we say 'signed-out' so the screen can open signInUrl() in a window for the user.
-import { AiError, type AiBackend, type AiStatus, type AskRequest, type ExplainRequest, type GradeManyRequest, type GradeRequest, type MakeQuestionsRequest, type StyleRequest, type WrittenRequest } from './backend';
+import { AiError, type AiBackend, type AiStatus, type AskRequest, type ExplainRequest, type GradeManyRequest, type GradeRequest, type MakeQuestionsRequest, type PageReadingResult, type ReadPageRequest, type StyleRequest, type WrittenRequest } from './backend';
 import { checkGrade, checkGradeMany, checkQuestions, checkStyle, checkText, checkWritten } from './check';
 
 /**
@@ -20,6 +20,15 @@ export function signInUrl(base = '/ai/', then = here()): string {
 function here(): string {
   const at = globalThis.location;
   return at ? `${at.pathname}${at.search}${at.hash}` : '/';
+}
+
+/** A request with its picture as base64url, the way the helper takes it (#175). */
+function withPicture<T extends { image?: Uint8Array }>(request: T): Omit<T, 'image'> & { image?: string } {
+  const { image, ...rest } = request;
+  if (!image) return rest;
+  let s = '';
+  for (const b of image) s += String.fromCharCode(b);
+  return { ...rest, image: btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') };
 }
 
 export class HttpAiBackend implements AiBackend {
@@ -62,11 +71,20 @@ export class HttpAiBackend implements AiBackend {
   }
 
   async explain(request: ExplainRequest, signal?: AbortSignal) {
-    return checkText(await this.post('explain', request, signal));
+    return checkText(await this.post('explain', withPicture(request), signal));
   }
 
   async ask(request: AskRequest, signal?: AbortSignal) {
-    return checkText(await this.post('ask', request, signal));
+    return checkText(await this.post('ask', withPicture(request), signal));
+  }
+
+  async readPage(request: ReadPageRequest, signal?: AbortSignal): Promise<PageReadingResult> {
+    const reply = (await this.post('read', withPicture(request), signal)) as Partial<PageReadingResult> | null;
+    const r = reply?.reading;
+    if (typeof reply?.model !== 'string' || !r || typeof r.pictureText !== 'string' || !Array.isArray(r.figures) || !Array.isArray(r.kinds) || typeof r.decorativeOnly !== 'boolean') {
+      throw new AiError('unavailable', 'The AI helper’s answer wasn’t readable.');
+    }
+    return reply as PageReadingResult;
   }
 
   private post(job: string, body: unknown, signal?: AbortSignal): Promise<unknown> {

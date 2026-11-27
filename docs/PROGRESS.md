@@ -82,6 +82,7 @@ slides" and "M6: AI helper and quizzes":
 | Reading pictures, step 4: the helper's queue (simulated batches, rounds, deadlines, daily limit) | #166 | Nathan's Claude | new `helper/queue.mjs`, `helper/seal.mjs`, the `/ai/work` and `/ai/results` routes in `helper/app.mjs`, `helper/Dockerfile`, `tests/helper/queue.test.mjs`, the work part of `tests/helper/helper.test.mjs` | **Done** (this PR). Switched off (501) until step 5 |
 | Reading pictures, step 5: the reading job (5a helper round, 5b storage, 5c the app sending pages) | #168 | Nathan's Claude | 5c: new `src/reading/work.ts`, `WorkRunner.tsx`, `src/db/work.ts`, `drawPagePng` in `src/reading/scan.ts`, the job note in `helper/queue.mjs`; 5b: new `src/types/reading.ts`, `src/db/readings.ts` (+ test), schema step 10, `ENTITY_STORE` and the sync server's entities, the cascades in `src/db/lectures.ts`; 5a: `helper/rounds.mjs`, `helper/reading.mjs` (moved from `tools/read-pages`), image support in `helper/claude.mjs`, `helper/server.mjs`, `tests/helper/reading.test.mjs` | **Done**: 5a (PR #169), 5b (PR #170), 5c (this PR). Live once `site-honed` and `honed-ai` update; nothing shows the readings yet (step 7) |
 | Reading pictures, step 6: questions by difficulty with the blind check (6a helper rounds, 6b app) | #172 | Nathan's Claude | 6b: `src/reading/work.ts` (the bank plan, text pages, filing questions), `src/reading/work.test.ts`; 6a: `questionRounds` in `helper/rounds.mjs`, the question plan and quick rounds in `helper/queue.mjs`, `helper/server.mjs`, `tests/helper/questions.test.mjs` | **Done**: 6a (PR #173), 6b (this PR). Live once `site-honed` updates |
+| Reading pictures, step 7: Explain, Ask and Box use the readings, a page read now | #175 | Nathan's Claude | `helper/jobs.mjs` (pictures for explain/ask, the `read` job), `readPage` in `helper/rounds.mjs`, `helper/app.mjs`; `src/ai/` (`readPage`, pictures), new `src/reading/explain.ts`, `drawAreaPng` in `src/reading/scan.ts`, `prepare` in `src/viewer/AnnotatedViewer.tsx`, `src/ui/DeckSlides.tsx` | **Done** (this PR) |
 
 ## Milestones
 
@@ -164,6 +165,12 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 27 (#175):** Explain this and Ask about this use the readings: the slide and its neighbours go with what the AI read
+  on their pictures; a slide with pictures not read yet is read now (`/ai/read`: Haiku, then Sonnet for hard content, the
+  same `readPage` as the batch) and saved, so the batch skips it; a box goes as a picture of its area. So a box with no
+  words can be explained, and its Ask is about the box (Nathan's Nov 26 report: Explain greyed out, Ask about the whole
+  slide). Tests: 5 helper, 4 `prepareAi`, 1 browser (on 3 devices); 7 deliberate breaks caught, among them the old
+  greyed-out rule.
 - **Nov 27 (#172, 6b):** The app sends banks to the queue: a section qualifies when it has unread pictures or its bank is
   missing questions (the app's own `planBank`, the class's guide as it stands, the bank's questions to avoid). Every
   covered page goes with its text (plus a reading already here); pictures only for unread pages; an unread picture page
