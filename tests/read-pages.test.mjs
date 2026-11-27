@@ -1,6 +1,6 @@
-// The reading job's answer check (tools/read-pages/reading.mjs, #155).
+// The reading job's answer check (helper/reading.mjs, #155, #168).
 import { describe, expect, it } from 'vitest';
-import { needsStrongerModel, parseReading, readingPrompt, READING_SYSTEM } from '../tools/read-pages/reading.mjs';
+import { needsStrongerModel, parseReading, readingPrompt, READING_SYSTEM } from '../helper/reading.mjs';
 
 const good = {
   pictureText: 'A fallacy is a defect in an argument.',

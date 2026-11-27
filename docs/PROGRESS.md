@@ -79,6 +79,7 @@ slides" and "M6: AI helper and quizzes":
 | Reading pictures, step 2: sort pages on the device, page fingerprints | #157 | Nathan's Claude | new `src/reading/` (`sort.ts`, `scan.ts`, tests, `calibrate.test.ts` skipped without real PDFs), optional `drawing`/`picture`/`noBar` in `src/viewer/test-pdf.ts` | **Done** (this PR). Not wired in yet: the queue (step 4) calls it |
 | Reading pictures, step 3: results keys | #161 | Nathan's Claude | `docs/SECURITY.md` ("AI work in the background", the threat table, "In short", "AI requests") first; then `src/lib/`, `src/types/crypto.ts`, `sync/` | **Done** (design PR #162 with Matt's OK, code PR #163) |
 | Reading pictures, step 4: the helper's queue (simulated batches, rounds, deadlines, daily limit) | #166 | Nathan's Claude | new `helper/queue.mjs`, `helper/seal.mjs`, the `/ai/work` and `/ai/results` routes in `helper/app.mjs`, `helper/Dockerfile`, `tests/helper/queue.test.mjs`, the work part of `tests/helper/helper.test.mjs` | **Done** (this PR). Switched off (501) until step 5 |
+| Reading pictures, step 5: the reading job (5a helper round, 5b storage, 5c the app sending pages) | #168 | Nathan's Claude | 5a: `helper/rounds.mjs`, `helper/reading.mjs` (moved from `tools/read-pages`), image support in `helper/claude.mjs`, `helper/server.mjs`, `tests/helper/reading.test.mjs` | 5a **done** (this PR); 5b, 5c next |
 
 ## Milestones
 
@@ -161,6 +162,11 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 26 (#168, 5a):** The helper's reading round, and the queue switched on (`HELPER_BACKGROUND`, batch delay 30 min,
+  margin 2 h, 300 pages a day by default). Haiku reads each picture page; hard kinds or an unreadable part go to Sonnet,
+  whose reading replaces Haiku's; one more ask for an unusable answer; pages already read skipped. `runClaude` takes a page
+  picture (stream-json, tools still off) and logs token counts. The reading prompt moved to `helper/reading.mjs`. Nothing
+  sends work until 5c. 5 tests; 5 deliberate breaks, all caught.
 - **Nov 26 (#166):** Reading pictures, step 4: the helper's queue, in memory. Rounds wait for the next simulated batch
   unless that would miss the deadline; run now on a study session; a daily page limit that spreads work over days and wins
   over deadlines; retries; results sealed to the account's results key (`helper/seal.mjs`, opened by the app's code in a
