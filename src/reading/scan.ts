@@ -110,3 +110,35 @@ function textBoxes(_page: PDFPageProxy, items: readonly unknown[], viewport: Ret
   }
   return boxes;
 }
+
+/** Pages are sent to be read this many pixels on their long edge (the model test, #155: readable, ~1,950 tokens). */
+export const READ_LONG_EDGE = 1200;
+
+/** A page drawn as a PNG for the AI to read (#168): READ_LONG_EDGE pixels on its long edge, on white. */
+export async function drawPagePng(doc: PDFDocumentProxy, n: number, longEdge = READ_LONG_EDGE): Promise<Uint8Array> {
+  if (!Number.isInteger(n) || n < 1 || n > doc.numPages) throw new RangeError(`No page ${n} in this deck.`);
+  const page = await doc.getPage(n);
+  try {
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: longEdge / Math.max(base.width, base.height) });
+    const factory = (doc as unknown as { canvasFactory: CanvasFactory }).canvasFactory;
+    const target = factory.create(Math.max(1, Math.round(viewport.width)), Math.max(1, Math.round(viewport.height)));
+    try {
+      await page.render({ canvas: target.canvas, canvasContext: target.context, viewport, background: 'white' }).promise;
+      return await toPng(target.canvas);
+    } finally {
+      factory.destroy(target);
+    }
+  } finally {
+    page.cleanup();
+  }
+}
+
+/** A canvas as PNG bytes: the browser's toBlob, or @napi-rs/canvas's toBuffer in Node (tests). */
+async function toPng(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+  const node = canvas as unknown as { toBuffer?: (type: string) => Uint8Array };
+  if (typeof node.toBuffer === 'function') return new Uint8Array(node.toBuffer('image/png'));
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+  if (!blob) throw new Error('This browser couldn’t draw the page as a picture.');
+  return new Uint8Array(await blob.arrayBuffer());
+}

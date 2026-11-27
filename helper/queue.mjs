@@ -22,6 +22,8 @@ export const QUEUE = {
   maxImage: 4 * 1024 * 1024,
   /** Pictures waiting, all people together, bytes: past this, new work is refused until some is done. */
   maxQueuedBytes: 300 * 1024 * 1024,
+  /** A job's note (sealed by the device with its own key: the helper can't read it), base64url characters. */
+  maxNote: 64 * 1024,
   /** Tries per round before a job is given up. */
   maxAttempts: 3,
   /** Jobs are forgotten this long after they arrive, whatever their state. */
@@ -47,7 +49,7 @@ export class WorkError extends Error {
 export function validateWork(body) {
   const bad = (m) => new WorkError(400, m);
   if (typeof body !== 'object' || body === null) throw bad('Send a JSON object.');
-  const { id, accountId, publicKey, neededBy, pages } = body;
+  const { id, accountId, publicKey, neededBy, pages, note } = body;
   if (typeof id !== 'string' || !ID.test(id)) throw bad('id: letters, digits, - and _ only, 1 to 64.');
   if (typeof accountId !== 'string' || !ID.test(accountId)) throw bad('accountId: letters, digits, - and _ only, 1 to 64.');
   if (typeof publicKey !== 'string' || !/^[\w-]{87}$/.test(publicKey)) throw bad('publicKey: a P-256 public key, base64url.');
@@ -74,7 +76,10 @@ export function validateWork(body) {
     seen.add(p.page);
     return { page: p.page, fp: p.fp, text: p.text, image };
   });
-  return { id, accountId, publicKey: new Uint8Array(Buffer.from(publicKey, 'base64url')), neededBy: needed, pages: decoded };
+  if (note !== undefined && note !== null && (typeof note !== 'string' || note.length > QUEUE.maxNote || !/^[\w-]*$/.test(note))) {
+    throw bad(`note: base64url, at most ${QUEUE.maxNote} characters.`);
+  }
+  return { id, accountId, publicKey: new Uint8Array(Buffer.from(publicKey, 'base64url')), neededBy: needed, pages: decoded, note: note ?? null };
 }
 
 const dayOf = (ms) => new Date(ms).toISOString().slice(0, 10);
@@ -200,8 +205,9 @@ export function createQueue(options) {
     }
     job.attempts = 0;
     if (r?.done || job.round === rounds.length - 1) {
-      const output = r?.done ? r.output : r?.carry;
-      const sealed = await seal(job.publicKey, job.accountId, job.id, new TextEncoder().encode(JSON.stringify(output ?? null)));
+      // The device's note comes back beside the work, inside the sealed result: which deck and pages it was
+      const output = { note: job.note ?? null, result: (r?.done ? r.output : r?.carry) ?? null };
+      const sealed = await seal(job.publicKey, job.accountId, job.id, new TextEncoder().encode(JSON.stringify(output)));
       results.set(key(job.person, job.id), { id: job.id, person: job.person, accountId: job.accountId, sealed, at: now() });
       job.state = 'done';
       job.pages = null; // the pictures aren't needed any more

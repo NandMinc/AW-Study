@@ -20,6 +20,7 @@ import { UnlockScreen } from './ui/UnlockScreen';
 import { isUpdateReady, onUpdateChange, setActivity } from './ui/update';
 import { GOOGLE_SETUP_RETURN, GOOGLE_UNLOCK_RETURN, JOIN_RETURN } from './sync/client';
 import { SyncRunner } from './sync/SyncRunner';
+import { WorkRunner } from './reading/WorkRunner';
 import type { Vault, VaultStatus } from './ui/vault';
 
 // With PDF.js, so loaded only when slides are opened
@@ -84,6 +85,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
           {status === 'unlocked' && <UpdateBanner />}
           {status === 'unlocked' && <BankJobsStatus />}
           {status === 'unlocked' && <SyncRunner onChanged={() => setDataVersion((v) => v + 1)} />}
+          {status === 'unlocked' && <WorkRunner onFiled={() => setDataVersion((v) => v + 1)} />}
           {status === 'unlocked' && (
             // A new screen slides in from where it comes from (#149); the header, footer and nav bar stay put
             <div key={pageKey(route)} className={motion ? `page page-${motion}` : 'page'} data-motion={motion ?? undefined}>
