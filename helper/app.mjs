@@ -1,5 +1,5 @@
 // The helper's HTTP API (served at /ai/ behind Cloudflare Access):
-//   POST /ai/questions, /ai/written, /ai/grade, /ai/grade-many, /ai/style, /ai/explain, /ai/ask: JSON in,
+//   POST /ai/questions, /ai/written, /ai/grade, /ai/grade-many, /ai/style, /ai/explain, /ai/ask, /ai/read: JSON in,
 //        JSON out (helper/jobs.mjs)
 //   GET  /ai/signin?then=<path>: where "Sign in for AI" goes; a page linking back into the app
 //   GET  /ai/whoami: for setting up (JSON: who you are, whether you're ready, today's count)
@@ -14,10 +14,14 @@ import { AccessError } from './access.mjs';
 import { ClaudeError, runClaude } from './claude.mjs';
 import { InputError, JOBS, ReplyError, systemPrompt } from './jobs.mjs';
 import { validateWork, WorkError } from './queue.mjs';
+import { readPage } from './rounds.mjs';
 
 export const MAX_BODY = 512 * 1024;
 /** POST /ai/work: a section's pages with their pictures (about 100-300 KB each as PNG, base64url). */
 export const MAX_WORK_BODY = 32 * 1024 * 1024;
+/** Explain, Ask and Read may carry a picture (a box, or a page drawn at 1,200 px), #175. */
+export const MAX_PICTURE_BODY = 8 * 1024 * 1024;
+const PICTURE_JOBS = new Set(['explain', 'ask', 'read']);
 
 /**
  * The models a request may ask for by name (`"model"` in its JSON), to compare them on the same slides.
@@ -185,7 +189,7 @@ export function createHelper(options) {
 
     let body;
     try {
-      body = JSON.parse(await readBody(req, MAX_BODY));
+      body = JSON.parse(await readBody(req, PICTURE_JOBS.has(job) ? MAX_PICTURE_BODY : MAX_BODY));
     } catch (err) {
       if (err instanceof TooLarge) return send(413, { error: 'The request is too large.' });
       return send(400, { error: 'The request isn’t valid JSON.' });
@@ -217,6 +221,17 @@ export function createHelper(options) {
     busy.add(person.label);
 
     try {
+      // Reading a page now (#175): Haiku, then Sonnet if needed, exactly as the batch reads one
+      if (JOBS[job].custom) {
+        try {
+          const read = await readPage(input, person.token, person.label, { run, timeoutMs, command: options.command, extraEnv: options.extraEnv, log });
+          attempts = 1;
+          return send(200, read);
+        } catch (err) {
+          if (err instanceof ClaudeError && err.code === 'timeout') return send(504, { error: err.message });
+          return send(502, { error: 'The page couldn’t be read. Try again.' });
+        }
+      }
       const prompt = JOBS[job].prompt(input);
       let lastProblem = null;
       while (attempts < 2) {
@@ -230,6 +245,8 @@ export function createHelper(options) {
             timeoutMs,
             command: options.command,
             extraEnv: options.extraEnv,
+            // A box's picture for Explain and Ask (#175): sent as an image, never inside the prompt's DATA
+            ...(input.image && { image: input.image }),
           });
           const answer = JOBS[job].check(text, input);
           // Say which model answered when one was asked for (comparing); other replies stay as they were

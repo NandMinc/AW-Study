@@ -22,21 +22,24 @@ export const READING_MODELS = { first: 'claude-haiku-5-5', stronger: 'claude-son
  * @param {object} [options.extraEnv]  (tests)
  * @param {(line: object) => void} [options.log]
  */
-export function readingRound(options) {
-  const { people, run, timeoutMs } = options;
+/**
+ * Reads one page (its picture and text): Haiku, then Sonnet if Haiku found hard content or couldn't read a part.
+ * The batch's reading round and the helper's `read` job (Explain or Ask on a page not read yet, #175) both use it.
+ * Gives { reading, model }; throws if the page can't be read twice running.
+ */
+export async function readPage(page, token, person, options) {
   const log = options.log ?? (() => {});
-
-  async function readOnce(page, model, token, person) {
+  async function readOnce(model) {
     let problem;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const text = await run({
+        const text = await options.run({
           prompt: readingPrompt(page.text),
           system: READING_SYSTEM,
           image: page.image,
           token,
           model,
-          timeoutMs,
+          timeoutMs: options.timeoutMs,
           command: options.command,
           extraEnv: options.extraEnv,
           onUsage: (u) => log({ work: 'read page', person, model, ...u }),
@@ -49,6 +52,13 @@ export function readingRound(options) {
     }
     throw new Error(`A page couldn't be read (${problem?.message}).`);
   }
+  const first = await readOnce(READING_MODELS.first);
+  if (!needsStrongerModel(first)) return { reading: first, model: READING_MODELS.first };
+  return { reading: await readOnce(READING_MODELS.stronger), model: READING_MODELS.stronger };
+}
+
+export function readingRound(options) {
+  const { people } = options;
 
   return {
     name: 'read',
@@ -65,12 +75,7 @@ export function readingRound(options) {
           continue;
         }
         readAny = true;
-        let reading = await readOnce(page, READING_MODELS.first, who.token, person);
-        let model = READING_MODELS.first;
-        if (needsStrongerModel(reading)) {
-          reading = await readOnce(page, READING_MODELS.stronger, who.token, person);
-          model = READING_MODELS.stronger;
-        }
+        const { reading, model } = await readPage(page, who.token, person, options);
         cache.set(`read:${page.fp}`, { reading, model });
         readings.push({ page: page.page, fp: page.fp, reading, model });
       }
