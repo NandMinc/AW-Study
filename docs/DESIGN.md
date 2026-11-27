@@ -20,6 +20,7 @@ Code: [github.com/NandMinc/AW-Study](https://github.com/NandMinc/AW-Study).
 | AI | Matt's and Nathan's Claude subscriptions, through Claude Code running in a locked-down helper on Nathan's home server (each person's own token). Not for other users. |
 | Quizzes | Multiple choice for normal studying (graded instantly, no AI). Short answers, graded by AI, for tests and exam practice. **Designed Nov 22 (#117):** questions follow a per-class exam style guide and have levels; regular quizzes may include short answers (two sentences at most), marked by the AI at the end. |
 | Slide formats | PDF only for the prototype. Faithful PowerPoint viewing matters later, because exporting some decks to PDF mangles them. |
+| Pictures and diagrams | **Designed Nov 26 (#151), not built:** pages with pictures are read once by Claude when they're added (text in pictures written out, diagrams described), with no choices for the student. Models by difficulty: Haiku first, Sonnet for the hard part, for reading and for quiz writing. See "Reading pictures and choosing models". |
 | Study budget | A lecture's length becomes its first study budget, spread over its first week; quiz results take over after that. Can change. |
 | Low scores | A low score marks the section as needing more study, and the planner adds study time in the coming days. It never sends you back into the slides on the spot. |
 | Flashcards | Left out for now; maybe a feature later. |
@@ -387,6 +388,95 @@ Multiple-choice quizzes need **no AI at the moment you take them**: the bank was
 **In the app**, every AI job goes through one `AiBackend` interface (`makeQuestions`, `makeWrittenQuestions`, `gradeAnswer`, `explain`, `ask`, and `status` for Settings). Tests use a fake, so they never spend usage or send data. Switching later to an API key or a local model means one new backend, not new screens.
 
 **Privacy note:** slide text travels device → Nathan's server → Anthropic for these jobs. The server passes it through without storing it. Data at rest stays only on your devices.
+
+## Reading pictures and choosing models (#151, designed Nov 26, not built)
+
+**Why.** Honed only reads a slide's text, and a lot of what students study isn't text. Two real files (Nov 26):
+
+- A philosophy handout ("Unit 4 Fallacies", 19 pages, saved from Word): the key definitions are in boxes that the PDF holds
+  as **pictures of text**. Every page has 1-4 of them; 6 pages have no text at all. The AI never saw those definitions,
+  and a Box drawn over one finds no words (so its Explain is greyed out).
+- An organic chemistry textbook sample (pages 51-58): plenty of real text (180-550 words a page), but every page also has
+  **drawings** (structures, curved arrows, electrostatic maps) over about a third to half of it, and text extraction loses
+  them, even a formula in the middle of a sentence ("the π electrons in the ___ bond", where `C=O` is drawn).
+
+OCR would fix the first file but not the second (it can't make sense of a structure). Claude can read both. Nathan's rule:
+**a student can add a file like these and the app understands it, without making any choices.**
+
+**The pipeline**
+
+1. **Sort the pages on the device when a file is added (free).** PDF.js gives each page's text; the app also draws the page
+   and measures what's drawn outside the text. Each page is one of: *text only* (done, nothing sent), *has pictures* (to be
+   read), or *already read* (the same page seen before, by a fingerprint of its picture: repeated title slides, slides that
+   build up step by step, the same handout added twice).
+2. **Read each picture page once, in the background.** The helper sends Claude the page as an image (about 1,280 px wide)
+   with its text, and asks for: the text that's in pictures, written out; a short description of each diagram's meaning
+   ("acetate ion, two resonance forms; a curved arrow moves a lone pair from the top O into the C=O bond"); or "nothing to
+   add" for decoration (logos, photos, backgrounds). The answer is kept **encrypted on the device with the slide's text**,
+   like everything else; the server keeps nothing.
+3. **The cheap model first, the strong one for the hard part.** Haiku 5.5 reads every picture page and says when it isn't
+   sure (chemical structures, graphs with data, circuits, dense maths). Those pages, about 1 in 4 (a guess to check), are
+   read again by Sonnet 5.5 (Nathan, Nov 26). Pages the student isn't about to study can go through the Batch API at half
+   the price.
+4. **The student only sees progress**, never a question: "Reading 14 diagrams…", "Quiz questions for slides 11-12 are
+   coming". If reading fails, quizzes are made from the text for now and the reading is tried again later.
+5. **Everything else gets the text plus the descriptions:** questions, Explain this, Ask about this, the exam style
+   guide. A Box over a diagram gets that diagram's description (and for a question about it, the box's picture).
+
+**Quizzes by difficulty too** (Nathan, Nov 26: "hard content could call on a higher model as needed, while using a lower
+model when possible").
+
+- **Haiku 5.5 writes** level 1 and 2 multiple choice on text-only pages and pages with easy pictures.
+- **Sonnet 5.5 writes** for pages whose reading needed Sonnet, level 3 questions and short answers, and exam practice's
+  written questions.
+- **Every Haiku question is checked** by a second cheap request: Haiku answers it from the slides without the answer key.
+  If it picks another option, finds two right, or can't tell, Sonnet rewrites that question. This is on top of the
+  helper's checks today (four options, one right answer, a slide number, nothing pointing at unseen material).
+- **Marking short answers, Explain this and Ask about this use Sonnet:** fairness matters, someone is waiting for the
+  answer, and there are few of them.
+- **The helper chooses the model, never the student.** Settings' Compare models (#79) stays for us to test with.
+
+**Cost per student per month** (estimates, about ±50%; Nov 26 API prices per million tokens in/out: Haiku 5.5 $0.10/$0.50,
+Sonnet 5.5 $2/$10, Opus 5.5 $4/$20).
+
+*Assumed student:* 4 classes × 2.5 lectures a week × 30 slides ≈ 1,300 slide pages a month, plus ~400 pages of readings,
+outlines and past exams; ~1,000 of the 1,700 pages have pictures. ~260 question-writing requests (5 slides, ~25 questions
+each), ~100 Explain/Ask. *Measured on the two files:* a page image costs ~1,200-1,400 tokens at a readable size (images
+cost by size, not content), a page's text 270-820 (the textbook) or ~300 (the handout). A picture page's reading costs
+about 1.7¢ on Opus, 0.9¢ on Sonnet, 0.04¢ on Haiku.
+
+| Setup | Reading pictures | Writing questions | Marking, Explain, Ask | **A month** |
+| --- | --- | --- | --- | --- |
+| Opus 5.5 everywhere (the helper's default today) | ~$17 | ~$30 | ~$2.50 | **~$50** |
+| Sonnet 5.5 everywhere | ~$8.60 | ~$15 | ~$1.50 | **~$25** |
+| **This design** (Haiku first; Sonnet for ~25% of reading, hard pages, level 3 and failed checks) | ~$2.60 (~$1.30 batched) | ~$7.50 (~$4 batched) | ~$1.50 | **~$7-12** |
+| Haiku everywhere (for comparison) | ~$0.45 | ~$0.75 | ~$0.15 | **~$1.50** |
+
+A heavy STEM student who adds every textbook chapter is about twice these. **Reading pictures is the small part:** in this
+design it adds roughly 10-25% to the bill; which model writes the questions is the big lever (40× between Haiku and Opus).
+The ~40% of questions written by Sonnet and the 1-in-4 pages read by Sonnet are guesses: log token counts from the start
+and replace them with real numbers.
+
+**What changes**
+
+- **The helper takes images** for the reading job only (and Ask about a Box). To confirm when building: Claude Code's
+  `claude -p` can take an image (`--input-format stream-json`) with every tool still off. If it can't, that's a reason to
+  move to the API sooner.
+- **"Questions stand on their own" (#115) stays**, but the AI now knows what a diagram shows, so a question can write the
+  diagram out in words when it needs it ("In the acetate ion, a lone pair moves from…"). It still never says "in this diagram".
+- **SECURITY.md and "Data and privacy":** slide pictures (not just text) go through the helper to Anthropic, passed on
+  without being stored. The stored descriptions are encrypted like the slide text.
+- **Paying for it:** during testing this runs on Matt's and Nathan's subscriptions, where the tiers stretch our usage
+  limits. Serving other students needs an API account (as far as we know, the subscriptions cover our own use only:
+  check the terms before going public), and then these per-token prices are the real cost.
+
+**Build order:** (1) a model test: run the two files above and a deck with graphs through each model, compare the
+descriptions and the questions side by side, and settle the 1-in-4 and the quiz split; (2) sorting pages on the device;
+(3) the reading job in the helper and storing the descriptions; (4) feeding them to questions, Explain, Ask and Box; (5)
+choosing the quiz model by difficulty with the blind check. Each its own `agent-task` issue and PR.
+
+**Open for Matt and Nathan:** the progress wording; whether reading waits for the Batch API by default (cheaper, but up
+to hours) or only for pages not due soon; whether "Reading diagrams" shows in the class page or only where it's waited for.
 
 ## Data and privacy
 

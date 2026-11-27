@@ -72,6 +72,7 @@ slides" and "M6: AI helper and quizzes":
 | Nav bar: hover rings the icon, the pill moves only with the page | #147 | Matt's Claude | the nav bar styles in `src/app.css`, the pill tests in `tests/browsers/look.spec.ts`, the nav bar part of `docs/design/README.md` | **Done** (PR #148) |
 | Animate the site, step 2: page transitions | #149 | Matt's Claude | new `src/ui/page-motion.ts` (+ test), the screen's wrapper and `usePageMotion` in `src/App.tsx`, the page transition styles in `src/app.css`, reduced motion by default in `playwright.config.ts`, `tests/browsers/motion.spec.ts`, the motion part of `docs/design/README.md` | **Done** (PR #150) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
+| Design: read pictures at upload, and choose models by difficulty (reading and quizzes) | #151 | Nathan's Claude | `docs/DESIGN.md` ("Reading pictures and choosing models", a line of "Decisions so far") | **Waiting for Matt's OK** (this PR). No code |
 
 ## Milestones
 
@@ -154,6 +155,12 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 26 (#151, design, waiting for Matt's OK):** Reading pictures. Two real files showed the AI misses what isn't text: a
+  handout whose definitions are pictures of text, and an organic chemistry textbook whose structures and arrows are
+  drawings. Design: pages sorted on the device, picture pages read once by Claude when added (Haiku first, Sonnet for about
+  1 in 4, Nathan's choice), the descriptions stored encrypted with the slide text; quizzes by difficulty too (Haiku; Sonnet
+  for hard pages, level 3 and questions that fail a blind check). Estimated ~$7-12 a student a month on the API (Opus
+  everywhere ~$50). First step when it's agreed: a side-by-side model test.
 - **Nov 26 (#149):** Page transitions. A new screen slides in 1.5rem and fades in over 0.24 s, from the side it comes
   from (`src/ui/page-motion.ts`). Between Tasks, Classes and Settings it follows the nav bar's order. Going deeper (a
   class, then What was covered?, the slides, a quiz, practice or Play) comes from the right, going back from the left,
