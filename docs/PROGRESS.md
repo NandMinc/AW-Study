@@ -76,6 +76,7 @@ slides" and "M6: AI helper and quizzes":
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 | Design: read pictures at upload, and choose models by difficulty (reading and quizzes) | #151 | Nathan's Claude | `docs/DESIGN.md` ("Reading pictures and choosing models", a line of "Decisions so far") | **Done** (PR #152, Matt's OK). Built in its own issues, in the design's build order |
 | Reading pictures, step 1: model test (Haiku vs Sonnet vs Opus on real pages) | #155 | Nathan's Claude | new `tools/read-pages/` (the tool and the reading prompt), `tests/read-pages.test.mjs`, "Model test results" in `docs/DESIGN.md` | **Done** (this PR): a handout, a chemistry textbook and a statistics textbook |
+| Reading pictures, step 2: sort pages on the device, page fingerprints | #157 | Nathan's Claude | new `src/reading/` (`sort.ts`, `scan.ts`, tests, `calibrate.test.ts` skipped without real PDFs), optional `drawing`/`picture`/`noBar` in `src/viewer/test-pdf.ts` | **Done** (this PR). Not wired in yet: the queue (step 4) calls it |
 
 ## Milestones
 
@@ -165,7 +166,11 @@ the "Test and publish" run on `main` to finish, then press Update.
   slide got 3 questions repeating ones asked where the ideas are taught. Summary, recap and learning-objectives slides
   are now skipped like title slides (`SKIP_SLIDES`, in both question jobs): **3 became 0**. Levels unchanged (18/24/28).
   **The helper changed: press Update for `honed-ai`.**
-
+- **Nov 26 (#157):** Reading pictures, step 2: sorting pages on the device. `scanPages` draws pages 300 px wide and calls a
+  page *pictures* when over 0.15% is drawn outside its text and the deck's template (logos and bars on most pages), *text*
+  or *blank* otherwise; vector graphs count. Calibrated on the three real PDFs (text pages measure 0; small graphs and
+  formulas 0.28-0.42%, so a first 0.4% cutoff missed two). Fingerprints are exact (text + drawing SHA-256): a near-match
+  rule wasn't safe. 18 tests; 5 deliberate breaks, all caught.
 - **Nov 26 (#155):** Reading pictures, step 1: the model test. `tools/read-pages/run.mjs` draws PDF pages and compares
   models on the reading prompt (`reading.mjs`, with `parseReading` and `needsStrongerModel`, tests in
   `tests/read-pages.test.mjs`; 4 deliberate breaks, all caught). Findings (DESIGN.md "Model test results"): `claude -p`

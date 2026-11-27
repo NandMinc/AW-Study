@@ -409,6 +409,18 @@ OCR would fix the first file but not the second (it can't make sense of a struct
    and measures what's drawn outside the text. Each page is one of: *text only* (done, nothing sent), *has pictures* (to be
    read), or *already read* (the same page seen before, by a fingerprint of its picture: repeated title slides, slides that
    build up step by step, the same handout added twice).
+   **Built (#157, `src/reading/`):** `scanPages(doc, pages)` draws each page 300 px wide, masks its text's boxes and the
+   deck's **template** (whatever is drawn in the same place on at least 60% of 12 pages spread over the deck: logos, bars,
+   header rules), and calls the page *pictures* when more than **0.15%** of it is drawn outside those, *text* otherwise,
+   *blank* with no text either. Calibrated on the three real PDFs: pages of only text measure exactly 0; a sparse scatter
+   plot, three small graphs in a question and formulas drawn as pictures measured 0.28-0.42% (missed at a first 0.4%
+   cutoff); a plain frame around text measures ~0.5% and is sent anyway, which costs a Haiku reading (~0.1¢) and loses
+   nothing. Vector drawings count like images. **Fingerprints are exact** (SHA-256 of the page's text and of its 300 px
+   drawing): the same page drawn 4% smaller moved further than some different pages were apart, so no "nearly the same"
+   rule was safe, and a wrong match would leave a page unread. Repeated slides and a file added twice match; a
+   re-exported PDF, or a device that draws a pixel differently, is just read again. Slides that build up step by step
+   are different pages and are each read (an idea for later: read only a build's last step). Nothing is wired into
+   uploads yet: the queue (step 4) calls it.
 2. **Read each picture page once, in the background.** The helper sends Claude the page as an image (about 1,280 px wide)
    with its text, and asks for: the text that's in pictures, written out; a short description of each diagram's meaning
    ("acetate ion, two resonance forms; a curved arrow moves a lone pair from the top O into the C=O bond"); or "nothing to
