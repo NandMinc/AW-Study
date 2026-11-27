@@ -73,6 +73,7 @@ slides" and "M6: AI helper and quizzes":
 | Animate the site, step 2: page transitions | #149 | Matt's Claude | new `src/ui/page-motion.ts` (+ test), the screen's wrapper and `usePageMotion` in `src/App.tsx`, the page transition styles in `src/app.css`, reduced motion by default in `playwright.config.ts`, `tests/browsers/motion.spec.ts`, the motion part of `docs/design/README.md` | **Done** (PR #150) |
 | Animate the site, step 3: ticking off a task | #153 | Matt's Claude | new `src/ui/tick-memory.ts` (+ test), `fresh` on `Tick` in `src/ui/TasksScreen.tsx`, the tick styles in `src/app.css`, the tick tests in `tests/browsers/motion.spec.ts`, the Tasks part of `docs/design/README.md` | **Done** (PR #154) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
+| Design: read pictures at upload, and choose models by difficulty (reading and quizzes) | #151 | Nathan's Claude | `docs/DESIGN.md` ("Reading pictures and choosing models", a line of "Decisions so far") | **Done** (PR #152, Matt's OK). Built in its own issues, in the design's build order |
 
 ## Milestones
 
@@ -155,12 +156,21 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 26 (#151, design, Matt's OK):** Reading pictures. Two real files showed the AI misses what isn't text: a
+  handout whose definitions are pictures of text, and an organic chemistry textbook whose structures and arrows are
+  drawings. Design: pages sorted on the device, picture pages read once by Claude when added (Haiku first, Sonnet for about
+  1 in 4, Nathan's choice), the descriptions stored encrypted with the slide text; quizzes by difficulty too (Haiku; Sonnet
+  for hard pages, level 3 and questions that fail a blind check). Estimated ~$7-12 a student a month on the API (Opus
+  everywhere ~$50). First step when it's agreed: a side-by-side model test. **Workflow agreed by Matt and Nathan the same
+  day:** batch the reading and the questions once pages are marked covered (the device sends only those pages, with a
+  "needed by" time; two rounds, a third if time allows; anything late runs straight away); results locked to the
+  account with a results key pair; Explain on an unread page reads it at once (kept by page fingerprint); a greyed quiz
+  button that says when the quiz will be ready; batches simulated on our subscriptions until there are other users.
 - **Nov 26 (#153):** Ticking off a task. Back on Tasks after a quiz, each tick done since the page was last shown (a
   lecture's Quiz done, a class's Done, Practice done) draws its stroke in with a small pop (`pathLength="1"` and
   `stroke-dashoffset`, 0.45 s). `src/ui/tick-memory.ts` remembers which ticks were seen, in memory only, per study
   day. The first look after the app opens, or at a new day's start, seeds it, so nothing draws then. Seen ticks stay
   still, and with reduced motion nothing moves. 9 deliberate breaks, all caught.
-
 - **Nov 26 (#149):** Page transitions. A new screen slides in 1.5rem and fades in over 0.24 s, from the side it comes
   from (`src/ui/page-motion.ts`). Between Tasks, Classes and Settings it follows the nav bar's order. Going deeper (a
   class, then What was covered?, the slides, a quiz, practice or Play) comes from the right, going back from the left,

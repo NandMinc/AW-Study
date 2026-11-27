@@ -20,6 +20,7 @@ Code: [github.com/NandMinc/AW-Study](https://github.com/NandMinc/AW-Study).
 | AI | Matt's and Nathan's Claude subscriptions, through Claude Code running in a locked-down helper on Nathan's home server (each person's own token). Not for other users. |
 | Quizzes | Multiple choice for normal studying (graded instantly, no AI). Short answers, graded by AI, for tests and exam practice. **Designed Nov 22 (#117):** questions follow a per-class exam style guide and have levels; regular quizzes may include short answers (two sentences at most), marked by the AI at the end. |
 | Slide formats | PDF only for the prototype. Faithful PowerPoint viewing matters later, because exporting some decks to PDF mangles them. |
+| Pictures and diagrams | **Designed Nov 26 (#151), not built:** pages with pictures are read once by Claude when they're added (text in pictures written out, diagrams described), with no choices for the student. Models by difficulty: Haiku first, Sonnet for the hard part, for reading and for quiz writing. Both run in batches once a lecture's pages are marked covered, with a deadline of the next study session (Matt and Nathan, Nov 26). See "Reading pictures and choosing models". |
 | Study budget | A lecture's length becomes its first study budget, spread over its first week; quiz results take over after that. Can change. |
 | Low scores | A low score marks the section as needing more study, and the planner adds study time in the coming days. It never sends you back into the slides on the spot. |
 | Flashcards | Left out for now; maybe a feature later. |
@@ -387,6 +388,150 @@ Multiple-choice quizzes need **no AI at the moment you take them**: the bank was
 **In the app**, every AI job goes through one `AiBackend` interface (`makeQuestions`, `makeWrittenQuestions`, `gradeAnswer`, `explain`, `ask`, and `status` for Settings). Tests use a fake, so they never spend usage or send data. Switching later to an API key or a local model means one new backend, not new screens.
 
 **Privacy note:** slide text travels device → Nathan's server → Anthropic for these jobs. The server passes it through without storing it. Data at rest stays only on your devices.
+
+## Reading pictures and choosing models (#151, designed Nov 26, not built)
+
+**Why.** Honed only reads a slide's text, and a lot of what students study isn't text. Two real files (Nov 26):
+
+- A philosophy handout ("Unit 4 Fallacies", 19 pages, saved from Word): the key definitions are in boxes that the PDF holds
+  as **pictures of text**. Every page has 1-4 of them; 6 pages have no text at all. The AI never saw those definitions,
+  and a Box drawn over one finds no words (so its Explain is greyed out).
+- An organic chemistry textbook sample (pages 51-58): plenty of real text (180-550 words a page), but every page also has
+  **drawings** (structures, curved arrows, electrostatic maps) over about a third to half of it, and text extraction loses
+  them, even a formula in the middle of a sentence ("the π electrons in the ___ bond", where `C=O` is drawn).
+
+OCR would fix the first file but not the second (it can't make sense of a structure). Claude can read both. Nathan's rule:
+**a student can add a file like these and the app understands it, without making any choices.**
+
+**The pipeline**
+
+1. **Sort the pages on the device when a file is added (free).** PDF.js gives each page's text; the app also draws the page
+   and measures what's drawn outside the text. Each page is one of: *text only* (done, nothing sent), *has pictures* (to be
+   read), or *already read* (the same page seen before, by a fingerprint of its picture: repeated title slides, slides that
+   build up step by step, the same handout added twice).
+2. **Read each picture page once, in the background.** The helper sends Claude the page as an image (about 1,280 px wide)
+   with its text, and asks for: the text that's in pictures, written out; a short description of each diagram's meaning
+   ("acetate ion, two resonance forms; a curved arrow moves a lone pair from the top O into the C=O bond"); or "nothing to
+   add" for decoration (logos, photos, backgrounds). The answer is kept **encrypted on the device with the slide's text**,
+   like everything else; the server keeps nothing.
+3. **The cheap model first, the strong one for the hard part.** Haiku 5.5 reads every picture page and says when it isn't
+   sure (chemical structures, graphs with data, circuits, dense maths). Those pages, about 1 in 4 (a guess to check), are
+   read again by Sonnet 5.5 (Nathan, Nov 26). Reading and question writing run **in batches** (below).
+4. **The student only sees progress**, never a question: "Reading 14 diagrams…", "Quiz questions for slides 11-12 are
+   coming". If reading fails, quizzes are made from the text for now and the reading is tried again later.
+5. **Everything else gets the text plus the descriptions:** questions, Explain this, Ask about this, the exam style
+   guide. A Box over a diagram gets that diagram's description (and for a question about it, the box's picture).
+
+**From upload to quiz** (agreed by Matt and Nathan, Nov 26: batch both the reading and the question writing)
+
+1. **The student adds a file** (say the 467-page chemistry textbook). It's stored on the server so their other devices
+   get it, encrypted as today (the server can't read it).
+2. **The student says what was covered** (say pages 51-58), as today in "What was covered?".
+3. **The study plan updates** at once, as today.
+4. **The device sends only the covered pages** to the helper there and then (the app is open at that moment): each page's
+   picture and text, never the whole file, plus a **"needed by" time**, the start of the next study session that uses
+   them. The server never needs to read the file or know anyone's schedule. If the device is offline, it sends them the
+   next time Honed opens.
+5. **The helper queues them** and runs the work in **batches**, with nothing for the student to do:
+   - **Round 1, reading:** picture pages only (text-only pages skip it), Haiku first and Sonnet for the pages Haiku
+     isn't sure of.
+   - **Round 2, questions:** written and blind-checked in the same request, so a check doesn't cost another round.
+   - **Rewrites** of questions that failed the check: in a **third batch** if round 2 finished early enough for it to come
+     back before the deadline, otherwise straight away.
+6. **The deadline is kept:** anything not back a margin before its "needed by" time (2 hours to start with) is processed
+   straight away, at the normal price. Starting a study session does the same for anything still waiting. So "ready for
+   your next study session" is always true.
+7. **Results come back locked to the student.** Each account gets a **results key pair**: the public half is on the server,
+   the private half is in the student's keyring, encrypted under their data key like everything else, so every device
+   that can unlock Honed can open the results. The helper encrypts each result with the public half and stores only that,
+   for the next sync, and asks Anthropic to delete the batch's copy once fetched. The server sees the pages only while
+   passing them on, as with the AI jobs today. Details for `docs/SECURITY.md` when it's built.
+8. **Explain this or Ask about this on a page that hasn't been read yet** reads that page straight away (the higher
+   price), uses it for the answer and saves it. Results are kept by **page fingerprint**: a page still waiting is taken off
+   the queue; if it was already sent in a batch (a batch can't be edited once sent), the later copy is simply dropped.
+9. **Pages are never read twice:** changing 51-58 to 51-60 queues only 59 and 60, removing pages drops their questions,
+   and a page in two sections (or two files) is read once, by fingerprint.
+10. **A daily page limit per account** (number to set) keeps one huge section from costing a fortune: the rest is spread
+    over the next days ("Quizzes for this big section arrive over the next few days").
+11. **Failures are retried** (an errored or expired request goes in the next batch; a page the AI refuses to read falls
+    back to its text). The student never sees them; Matt and Nathan get a list (in the helper's log or an admin view).
+
+**A quiz that isn't ready yet** (Nathan, Nov 26). The quiz button looks greyed out, but it still answers a tap (it's
+`aria-disabled`, not `disabled`, so screen readers say it's unavailable and the tap still works). A tap opens a small box:
+
+> **Your quiz is still being written**
+> Questions for pages 51-58 will be ready for your next study session (Thursday, 4:00 PM).
+> [Study the pages now] [OK]
+
+With no study session planned, the second line says "…will be ready within a day". Once the deadline has passed and the
+questions are being written straight away: "Almost ready: your questions are being written now." The button turns
+normal as soon as the questions arrive.
+
+**Batches before there's an API account** (Nathan, Nov 26). Until Honed has users besides Matt and Nathan, there's no
+API account: the helper **simulates batches** on our subscriptions with Claude Code. It keeps the same queue, rounds,
+deadlines, fingerprints and results keys, and runs each "batch" itself after a set delay (configurable, so tests can make
+it slow or fast). Moving to the real Batch API later replaces only the part that sends a batch and collects the results.
+
+**Quizzes by difficulty too** (Nathan, Nov 26: "hard content could call on a higher model as needed, while using a lower
+model when possible").
+
+- **Haiku 5.5 writes** level 1 and 2 multiple choice on text-only pages and pages with easy pictures.
+- **Sonnet 5.5 writes** for pages whose reading needed Sonnet, level 3 questions and short answers, and exam practice's
+  written questions.
+- **Every Haiku question is checked** by a second cheap request: Haiku answers it from the slides without the answer key.
+  If it picks another option, finds two right, or can't tell, Sonnet rewrites that question. This is on top of the
+  helper's checks today (four options, one right answer, a slide number, nothing pointing at unseen material).
+- **Marking short answers, Explain this and Ask about this use Sonnet:** fairness matters, someone is waiting for the
+  answer, and there are few of them.
+- **The helper chooses the model, never the student.** Settings' Compare models (#79) stays for us to test with.
+
+**Cost per student per month** (estimates, about ±50%; Nov 26 API prices per million tokens in/out: Haiku 5.5 $0.10/$0.50,
+Sonnet 5.5 $2/$10, Opus 5.5 $4/$20).
+
+*Assumed student:* 4 classes × 2.5 lectures a week × 30 slides ≈ 1,300 slide pages a month, plus ~400 pages of readings,
+outlines and past exams; ~1,000 of the 1,700 pages have pictures. ~260 question-writing requests (5 slides, ~25 questions
+each), ~100 Explain/Ask. *Measured on the two files:* a page image costs ~1,200-1,400 tokens at a readable size (images
+cost by size, not content), a page's text 270-820 (the textbook) or ~300 (the handout). A picture page's reading costs
+about 1.7¢ on Opus, 0.9¢ on Sonnet, 0.04¢ on Haiku.
+
+| Setup | Reading pictures | Writing questions | Marking, Explain, Ask | **A month** |
+| --- | --- | --- | --- | --- |
+| Opus 5.5 everywhere (the helper's default today) | ~$17 | ~$30 | ~$2.50 | **~$50** |
+| Sonnet 5.5 everywhere | ~$8.60 | ~$15 | ~$1.50 | **~$25** |
+| **This design** (Haiku first; Sonnet for ~25% of reading, hard pages, level 3 and failed checks) | ~$2.60 (~$1.30 batched) | ~$7.50 (~$4 batched) | ~$1.50 | **~$7-12** |
+| Haiku everywhere (for comparison) | ~$0.45 | ~$0.75 | ~$0.15 | **~$1.50** |
+
+A heavy STEM student who adds every textbook chapter is about twice these. **Reading pictures is the small part:** in this
+design it adds roughly 10-25% to the bill; which model writes the questions is the big lever (40× between Haiku and Opus).
+The ~40% of questions written by Sonnet and the 1-in-4 pages read by Sonnet are guesses: log token counts from the start
+and replace them with real numbers.
+
+**What changes**
+
+- **The helper takes images** for the reading job only (and Ask about a Box). To confirm when building: Claude Code's
+  `claude -p` can take an image (`--input-format stream-json`) with every tool still off. If it can't, that's a reason to
+  move to the API sooner.
+- **"Questions stand on their own" (#115) stays**, but the AI now knows what a diagram shows, so a question can write the
+  diagram out in words when it needs it ("In the acetate ion, a lone pair moves from…"). It still never says "in this diagram".
+- **SECURITY.md and "Data and privacy":** slide pictures (not just text) go through the helper to Anthropic, passed on
+  without being stored. The stored descriptions are encrypted like the slide text.
+- **Paying for it:** during testing this runs on Matt's and Nathan's subscriptions (batches simulated, above), where the
+  tiers stretch our usage limits. When Honed has other users it moves to an API account (Nathan, Nov 26; as far as we
+  know the subscriptions cover our own use only), and then these per-token prices, with the Batch API's half price, are
+  the real cost.
+- **The batch flow needs an account:** results are delivered through the server, so it works for signed-in students.
+  Without an account, the app keeps today's way (questions made straight away while the app is open).
+- **New on the server:** the helper's queue, the results keys (schema step in `honed-sync`), and the daily page limit.
+
+**Build order:** (1) a model test: run the two files above and a deck with graphs through each model, compare the
+descriptions and the questions side by side, and settle the 1-in-4 and the quiz split; (2) sorting pages on the device
+and page fingerprints; (3) the results keys (SECURITY.md first, its own PR); (4) the helper's queue with simulated batches,
+rounds, deadlines and the daily limit; (5) the reading job and storing the descriptions; (6) questions by difficulty with
+the blind check, through the queue; (7) Explain, Ask and Box using the descriptions, reading a page straight away when
+needed; (8) the quiz button while questions are being written. Each its own `agent-task` issue and PR.
+
+**Open for Matt and Nathan:** the progress wording; whether "Reading diagrams" shows on the class page or only where
+it's waited for; the daily page limit; the deadline margin (2 hours to start).
 
 ## Data and privacy
 
