@@ -68,6 +68,7 @@ slides" and "M6: AI helper and quizzes":
 | Exam style 5: short answers in quizzes | #124 | Nathan's Claude | `RULES.levels.shortAnswers` on, `pickQuiz`'s short answers, new `src/quiz/start.ts` (+ test), the `Quiz` component in `QuizScreen.tsx` (typed answers, marking at the end), `describeScore`'s weighted percentage, `PlayScreen`, `tests/browsers/short-answers.spec.ts` | **Done** (this PR) |
 | After-class reminder: a popup when Honed opens links to the lecture to fill in | #129 | Matt's Claude | new `src/ui/AfterClass.tsx` and `src/ui/after-class.ts` (+ tests), its place in `src/App.tsx`, `tests/browsers/after-class.spec.ts` | **Done** (PR #132). Try on a real phone after deploy |
 | First-run tutorial: a short tour, then Getting started on Tasks | #136 | Matt's Claude | new `src/ui/GettingStarted.tsx` and `src/ui/getting-started.ts` (+ tests), `start` in `planning.ts`, its place in `TasksScreen.tsx`, `#/tour` and `#/classes/new` (`route.ts`, `App.tsx`, `ClassesScreen.tsx`), Help in `SettingsScreen.tsx`, the `storageState` in `playwright.config.ts`, `tests/browsers/first-run.spec.ts` | **Done** (PR #137). Milestone 8 is done |
+| Animate the site, step 1: the nav bar's pill slides, buttons fill in on hover and press | #143 | Matt's Claude | `NavBar.tsx` (the pill, `data-at`), the nav bar styles in `src/app.css`, the pill tests in `tests/browsers/look.spec.ts`, the nav bar part of `docs/design/README.md` | **Done** (PR #144). Later steps get their own issues |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -150,6 +151,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 26 (#143):** Animating the site begins (Matt). The nav bar's green pill is now one element behind the three
+  buttons. It slides (0.3 s) to the button under the mouse and back when the mouse leaves, to a focused or pressed
+  button, and to the new page. The button under it turns dark grey, and a press shrinks it a little. Hover counts
+  only with a mouse (`@media (hover: hover)`): a tap on a phone would leave the pill stuck on a page you didn't
+  open. With reduced motion (`prefers-reduced-motion`) nothing slides. CSS only, placed by `data-at` and `:has`:
+  no `style=` (CSP). It slides between pages because the bar stays the same element (`App.tsx` renders one
+  `NavBar`): giving it a `key` per page would break that, and the test checks for it.
 
 - **Nov 23 (#141, agreed by Matt):** The bug button from Nathan's other apps: off unless `?bugs=on` or Settings'
   switch; a picture of the screen and a note, sent to `https://bugs.pacificfish.ca/api/bugs` (Nathan's admin server behind
@@ -614,6 +623,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- **The nav bar must stay one element between the three main pages** (#143): its pill slides from the old page to
+  the new one only because React keeps the same `<nav>`. Don't give `NavBar` a `key`, or render it inside each page.
+  Hover styles go inside `@media (hover: hover)`, or a phone keeps a tapped button "hovered".
 - **Browser tests start past the first run** (#136): `playwright.config.ts` gives every test's context localStorage
   saying the tour was seen and Getting started skipped (for 127.0.0.1 and localhost). A test that makes its own
   context with `browser.newContext()` doesn't get it, so the tour opens there: pass the same `storageState`.

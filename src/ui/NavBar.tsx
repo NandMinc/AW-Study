@@ -1,6 +1,8 @@
 // The bar at the bottom of the three main pages (docs/design/README.md, "Nav bar"): Tasks (a house),
 // Classes (a stack of books) and Settings (a gear). The current page's icon sits on a filled green
 // pill. Full-screen screens (a class, the slides, a quiz, Play) don't show it: they have a back link.
+// The pill is one element behind the buttons (#143): it slides to a button that's hovered or pressed and
+// to the new page, so the bar must stay the same element between the three pages (it does, in App.tsx).
 import type { JSX } from 'react';
 import { href, type Route } from './route';
 
@@ -19,7 +21,8 @@ const PAGES: { page: MainPage; label: string; icon: () => JSX.Element }[] = [
 
 export function NavBar({ current }: { current: MainPage }) {
   return (
-    <nav className="nav-bar" aria-label="Pages">
+    <nav className="nav-bar" aria-label="Pages" data-at={PAGES.findIndex((p) => p.page === current)}>
+      <span className="nav-pill" aria-hidden="true" />
       {PAGES.map(({ page, label, icon: Icon }) => (
         <a key={page} href={href({ name: page })} aria-label={label} aria-current={page === current ? 'page' : undefined}>
           <Icon />

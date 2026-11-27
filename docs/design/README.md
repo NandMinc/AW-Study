@@ -41,6 +41,11 @@ the `+` in the drawing was a placeholder) and **Settings** (a gear). The current
 dark grey (`#272727`) on a filled green rounded rectangle (white as drawn was too faint on green;
 Nathan, Nov 19); the others are green outlines.
 
+It moves (#143, Matt, Nov 26): the green pill slides to a button under the mouse and back when the mouse
+leaves, and to the new page when one is pressed. The button it's under fills in (its icon turns dark
+grey), and a pressed button shrinks a little. There's no hover on a phone, just the slide to the page you
+tap, and nothing moves for someone who has turned on reduced motion.
+
 The nav bar is on the three main pages only. Full-screen screens (the slide viewer, a quiz, Play,
 editing a class) hide it and have a back button instead (our call).
 

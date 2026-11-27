@@ -126,3 +126,60 @@ test('the browser’s own controls follow the look: file pickers in our font, gr
   const checkbox = page.getByRole('form', { name: 'What was covered?' }).getByRole('checkbox').first();
   expect(await checkbox.evaluate((el) => getComputedStyle(el).accentColor)).toBe('rgb(159, 232, 112)'); // #9fe870
 });
+
+// The nav bar's pill slides (#143): one element behind the buttons, under the current page, moving to a hovered
+// button (only with a mouse) and back, and to the new page when one is pressed; no movement with reduced motion.
+test.describe('the nav bar pill slides', () => {
+  const ACCENT_DARK = 'rgb(159, 232, 112)'; // --accent in dark, #9fe870
+  /** How far the pill's middle is from a button's middle, in pixels (0 once it has slid there). */
+  const offset = (page: Page, label: string) =>
+    navBar(page).evaluate((nav, name) => {
+      const pill = nav.querySelector('.nav-pill')!.getBoundingClientRect();
+      const button = nav.querySelector(`a[aria-label="${name}"]`)!.getBoundingClientRect();
+      return Math.round(Math.abs(pill.left + pill.width / 2 - (button.left + button.width / 2)));
+    }, label);
+  const colour = (page: Page, label: string) => navBar(page).getByRole('link', { name: label }).evaluate((a) => getComputedStyle(a).color);
+
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await openUnlocked(page);
+  });
+
+  test('it sits under the current page and slides to the next, the bar staying the same element', async ({ page }) => {
+    const nav = navBar(page);
+    await expect.poll(() => offset(page, 'Tasks')).toBe(0);
+    expect(await nav.locator('.nav-pill').evaluate((p) => getComputedStyle(p).transitionDuration)).toBe('0.3s');
+    await nav.evaluate((n) => ((n as HTMLElement & { marked?: boolean }).marked = true));
+
+    await nav.getByRole('link', { name: 'Classes' }).click();
+    await expect(page.getByRole('heading', { level: 2, name: 'Classes' })).toBeVisible();
+    await expect.poll(() => offset(page, 'Classes')).toBe(0);
+    expect(await nav.evaluate((n) => (n as HTMLElement & { marked?: boolean }).marked)).toBe(true); // not drawn again: it slid
+
+    await nav.getByRole('link', { name: 'Settings' }).click();
+    await expect.poll(() => offset(page, 'Settings')).toBe(0);
+  });
+
+  test('a hovered button fills in, and the pill comes back when the mouse leaves; not on a phone', async ({ page }, info) => {
+    await expect.poll(() => offset(page, 'Tasks')).toBe(0);
+    await navBar(page).getByRole('link', { name: 'Settings' }).hover();
+    if (info.project.name === 'desktop') {
+      await expect.poll(() => offset(page, 'Settings')).toBe(0);
+      await expect.poll(() => colour(page, 'Settings')).toBe(GREY);
+      await expect.poll(() => colour(page, 'Tasks')).toBe(ACCENT_DARK);
+      await page.mouse.move(5, 5);
+      await expect.poll(() => offset(page, 'Tasks')).toBe(0);
+      await expect.poll(() => colour(page, 'Tasks')).toBe(GREY);
+    } else {
+      // A tap leaves a phone "hovering": the pill must not stay on a page you didn't open
+      await page.waitForTimeout(400);
+      expect(await offset(page, 'Tasks')).toBe(0);
+      expect(await colour(page, 'Settings')).toBe(ACCENT_DARK);
+    }
+  });
+
+  test('with reduced motion it moves at once', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+    expect(await navBar(page).locator('.nav-pill').evaluate((p) => getComputedStyle(p).transitionDuration)).toBe('0s');
+  });
+});
