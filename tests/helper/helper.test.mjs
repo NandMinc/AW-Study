@@ -9,6 +9,9 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { accessChecker } from '../../helper/access.mjs';
 import { createHelper, MAX_BODY, peopleFromEnv, returnPath } from '../../helper/app.mjs';
+import { createQueue } from '../../helper/queue.mjs';
+import { newDataKey } from '../../src/lib/crypto';
+import { newResultsKey, openResult } from '../../src/lib/results-key';
 import { claudeArgs } from '../../helper/claude.mjs';
 import { buildPrompt, refersToUnseen } from '../../helper/jobs.mjs';
 
@@ -759,4 +762,95 @@ describe('exam style (#121)', () => {
       expect(calls()).toHaveLength(0);
     });
   }
+});
+
+describe('AI work in the background (#166)', () => {
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9]).toString('base64url');
+  const fp = (n) => n.toString(16).padStart(64, '0');
+
+  /** A request to a work route as a signed-in person (GET, or POST with a JSON body). */
+  function call(path, { method = 'GET', body, email = 'matt@example.com', headers = {} } = {}) {
+    const all = {
+      'cf-access-jwt-assertion': token({ email }),
+      'cf-access-authenticated-user-email': email,
+      ...(method === 'POST' ? { 'content-type': 'application/json' } : {}),
+      ...headers,
+    };
+    return fetch(`${base}/ai/${path}`, {
+      method,
+      headers: Object.fromEntries(Object.entries(all).filter(([, v]) => v !== undefined)),
+      body: method === 'POST' ? (typeof body === 'string' ? body : JSON.stringify(body ?? {})) : undefined,
+    });
+  }
+
+  async function withQueue() {
+    const { upload, key } = await newResultsKey(await newDataKey());
+    const queue = createQueue({
+      rounds: [{ name: 'read', run: async ({ pages }) => ({ carry: { pages: pages.map((p) => p.page) } }) }],
+      delayMs: 3_600_000,
+      marginMs: 7_200_000,
+      dailyPages: 50,
+      now: () => clock,
+    });
+    await start([], { queue });
+    const job = {
+      id: 'sec-1',
+      accountId: 'acc1',
+      publicKey: Buffer.from(upload.publicKey).toString('base64url'),
+      neededBy: null,
+      pages: [51, 52].map((page) => ({ page, fp: fp(page), text: `page ${page}`, image: PNG })),
+    };
+    return { queue, key, job };
+  }
+
+  it('is switched off without a queue', async () => {
+    await start([]);
+    expect((await call('work', { method: 'POST', body: {} })).status).toBe(501);
+    expect((await call('results')).status).toBe(501);
+  });
+
+  it('takes work, says how it stands, runs it, gives the sealed result once, and keeps people apart', async () => {
+    const { queue, key, job } = await withQueue();
+    const added = await call('work', { method: 'POST', body: job });
+    expect(added.status).toBe(202);
+    expect(await added.json()).toMatchObject({ id: 'sec-1', state: 'waiting', round: 'read' });
+    expect(await (await call('work/sec-1')).json()).toMatchObject({ state: 'waiting' });
+    // Nathan doesn't see Matt's work
+    const other = await call('work/sec-1', { email: 'nathan@example.com' });
+    expect(other.status).toBe(404);
+    expect(await other.json()).toMatchObject({ unknown: true });
+    // A study session starts: it runs now
+    expect(await (await call('work/sec-1/now', { method: 'POST' })).json()).toMatchObject({ readyAt: clock.toISOString() });
+    await queue.tick();
+    expect(await (await call('work/sec-1')).json()).toMatchObject({ state: 'done' });
+    const { results } = await (await call('results')).json();
+    expect(results).toHaveLength(1);
+    const r = results[0];
+    const sealed = { v: 1, epk: new Uint8Array(Buffer.from(r.sealed.epk, 'base64url')), iv: new Uint8Array(Buffer.from(r.sealed.iv, 'base64url')), ct: new Uint8Array(Buffer.from(r.sealed.ct, 'base64url')) };
+    expect(JSON.parse(new TextDecoder().decode(await openResult(key, r.accountId, r.id, sealed)))).toEqual({ pages: [51, 52] });
+    expect((await (await call('results', { email: 'nathan@example.com' })).json()).results).toEqual([]);
+    expect(await (await call('results/confirm', { method: 'POST', body: { ids: ['sec-1'] } })).json()).toEqual({ deleted: 1 });
+    expect((await (await call('results')).json()).results).toEqual([]);
+    // No content in the logs: routes, people, counts
+    expect(JSON.stringify(logs)).not.toContain('page 51');
+  });
+
+  it('checks requests like every other job', async () => {
+    const { job } = await withQueue();
+    expect((await call('work', { method: 'POST', body: job, headers: { origin: 'https://evil.example' } })).status).toBe(403);
+    expect((await call('work', { method: 'POST', body: job, headers: { 'content-type': 'text/plain' } })).status).toBe(415);
+    expect((await call('work', { method: 'POST', body: job, headers: { 'cf-access-jwt-assertion': undefined } })).status).toBe(401);
+    expect((await call('work', { method: 'POST', body: job, email: 'stranger@example.com' })).status).toBe(403);
+    expect((await call('work', { method: 'POST', body: { ...job, id: 'bad id' } })).status).toBe(400);
+    expect((await call('work', { method: 'POST', body: '{not json' })).status).toBe(400);
+    expect((await call('work', { method: 'PUT', body: job })).status).toBe(405);
+    expect((await call('results/confirm', { method: 'POST', body: { ids: [] } })).status).toBe(400);
+    expect((await call('work/a/b/c')).status).toBe(404);
+  });
+
+  it('refuses a request too large for it', async () => {
+    await withQueue();
+    const huge = 'x'.repeat(MAX_BODY + 10);
+    expect((await call('results/confirm', { method: 'POST', body: { ids: ['a'], pad: huge } })).status).toBe(413);
+  });
 });
