@@ -414,9 +414,11 @@ OCR would fix the first file but not the second (it can't make sense of a struct
    ("acetate ion, two resonance forms; a curved arrow moves a lone pair from the top O into the C=O bond"); or "nothing to
    add" for decoration (logos, photos, backgrounds). The answer is kept **encrypted on the device with the slide's text**,
    like everything else; the server keeps nothing.
-3. **The cheap model first, the strong one for the hard part.** Haiku 5.5 reads every picture page and says when it isn't
-   sure (chemical structures, graphs with data, circuits, dense maths). Those pages, about 1 in 4 (a guess to check), are
-   read again by Sonnet 5.5 (Nathan, Nov 26). Reading and question writing run **in batches** (below).
+3. **The cheap model first, the strong one for the hard part.** Haiku 5.5 reads every picture page and says what kinds of
+   content its pictures hold. Pages with **hard kinds** (chemistry, graphs, maths, circuits) or a part it couldn't read are
+   read again by Sonnet 5.5 (Nathan, Nov 26; the routing by kind comes from the model test, below). How many pages that is
+   depends on the subject: none of the handout's, all of the chemistry textbook's. Reading and question writing run **in
+   batches** (below).
 4. **The student only sees progress**, never a question: "Reading 14 diagrams…", "Quiz questions for slides 11-12 are
    coming". If reading fails, quizzes are made from the text for now and the reading is tried again later.
 5. **Everything else gets the text plus the descriptions:** questions, Explain this, Ask about this, the exam style
@@ -504,13 +506,46 @@ about 1.7¢ on Opus, 0.9¢ on Sonnet, 0.04¢ on Haiku.
 A heavy STEM student who adds every textbook chapter is about twice these. **Reading pictures is the small part:** in this
 design it adds roughly 10-25% to the bill; which model writes the questions is the big lever (40× between Haiku and Opus).
 The ~40% of questions written by Sonnet and the 1-in-4 pages read by Sonnet are guesses: log token counts from the start
-and replace them with real numbers.
+and replace them with real numbers. **The model test (below) measured reading at about 3× this table's figure.**
+
+**Model test results** (#155, Nov 26). `tools/read-pages/` draws chosen PDF pages (PDF.js in Chromium, 1,200 px on the long
+edge), sends each to each model with the reading prompt (`tools/read-pages/reading.mjs`) through `claude -p` locked down as
+the helper runs it, and saves the answers side by side with their token counts and the API price Claude Code reports.
+The files and answers stay outside the repo (other people's material). Run on 4 pages of the fallacies handout (2 with
+boxes of text as pictures, 2 with no text at all) and 8 pages of the chemistry textbook (51-58).
+
+- **`claude -p` takes a page image with every tool off** (stream-json input). The helper can read pictures on our
+  subscriptions; no need to move to the API first.
+- **Pictures of text: Haiku is enough.** All three models wrote out the handout's boxes word for word.
+- **Chemistry: Sonnet is needed, Opus isn't.** Haiku got the curved-arrow mechanisms right but called dimethyl
+  sulfoxide's CH3 groups CH2 (once, hedged) and described a table only in general. Sonnet and Opus were both exact, every
+  table entry included; Sonnet costs about 60% of Opus.
+- **Route by kind of content, not by the model saying it's unsure.** Asked to flag "content where a misreading is likely",
+  every model flagged nearly every chemistry page, so the flag meant "chemistry", not "I misread". The prompt now lists
+  the page's `kinds`, keeps `unsure` for a part that truly couldn't be read, and `needsStrongerModel` sends hard kinds on.
+  With that: handout 0 of 4 pages to Sonnet, textbook 8 of 8.
+- **Two prompt fixes the test found:** a box that only holds text isn't a figure (Opus listed each box twice), and
+  "describe, don't solve" (Opus named which fallacy each exercise shows, which would give quiz answers away).
+
+| Per page (measured) | Tokens in | Tokens out (Haiku's include its thinking) | Price (Claude Code's report) |
+| --- | --- | --- | --- |
+| Handout, Haiku | ~2,950 | ~920 | $0.001 |
+| Handout, Sonnet | ~2,950 | ~390 | $0.013 |
+| Textbook, Haiku | ~3,800 | ~2,350 | $0.0018 |
+| Textbook, Sonnet | ~3,800 | ~1,400 | $0.026 |
+| Textbook, Opus | ~3,600 | ~820 | $0.040 |
+
+A page image at 1,200 px costs about **1,950 tokens** (the formula estimate was ~1,300); the prompt about 750, and the page's
+own text the rest. Prices include Claude Code writing each request to a one-hour cache (each run is fresh), so the API
+with batches will be cheaper. **Reading, a month, for the example student:** if 3 in 10 picture pages are hard, about $9
+($4.50 batched); a student whose courses are mostly chemistry-like, about $20-28 ($10-14 batched). Hard pages are read by
+Haiku first and then Sonnet: a quick Haiku "kinds only" pass would save about 0.15¢ per hard page, too little for now.
+**Still to test:** a deck with graphs (plotted data).
 
 **What changes**
 
-- **The helper takes images** for the reading job only (and Ask about a Box). To confirm when building: Claude Code's
-  `claude -p` can take an image (`--input-format stream-json`) with every tool still off. If it can't, that's a reason to
-  move to the API sooner.
+- **The helper takes images** for the reading job only (and Ask about a Box). Confirmed by the model test: `claude -p`
+  takes an image (`--input-format stream-json`) with every tool still off.
 - **"Questions stand on their own" (#115) stays**, but the AI now knows what a diagram shows, so a question can write the
   diagram out in words when it needs it ("In the acetate ion, a lone pair moves from…"). It still never says "in this diagram".
 - **SECURITY.md and "Data and privacy":** slide pictures (not just text) go through the helper to Anthropic, passed on
