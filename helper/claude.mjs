@@ -24,11 +24,14 @@ export class ClaudeError extends Error {
 
 const MAX_OUTPUT = 2 * 1024 * 1024;
 
-/** The arguments every run gets. Tests check the tools-off ones are always there. */
-export function claudeArgs({ system, model }) {
+/**
+ * The arguments every run gets. Tests check the tools-off ones are always there. `stream`: the prompt goes in
+ * as a stream-json message, so it can carry a picture (a page to read, #168); the answer comes back as JSON lines.
+ */
+export function claudeArgs({ system, model, stream = false }) {
   return [
     '-p',
-    '--output-format', 'json',
+    ...(stream ? ['--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose'] : ['--output-format', 'json']),
     '--tools', '',
     '--disallowedTools', '*',
     '--strict-mcp-config',
@@ -44,7 +47,21 @@ export function claudeArgs({ system, model }) {
  * Runs `claude` once and gives its answer text. `command` is the program and any leading
  * arguments (tests use a fake). `extraEnv` exists for tests only.
  */
-export async function runClaude({ prompt, system, token, model, timeoutMs, command = ['claude'], extraEnv = {} }) {
+export async function runClaude({ prompt, system, token, model, timeoutMs, command = ['claude'], extraEnv = {}, image, onUsage }) {
+  // With a picture (a PNG page to read): one stream-json message holding the picture and the prompt
+  const stream = image !== undefined;
+  const input = stream
+    ? `${JSON.stringify({
+        type: 'user',
+        message: {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/png', data: Buffer.from(image).toString('base64') } },
+            { type: 'text', text: prompt },
+          ],
+        },
+      })}\n`
+    : prompt;
   const home = await mkdtemp(join(tmpdir(), 'honed-ai-'));
   try {
     const env = {
@@ -63,7 +80,7 @@ export async function runClaude({ prompt, system, token, model, timeoutMs, comma
     };
     const [program, ...lead] = command;
     const stdout = await new Promise((resolve, reject) => {
-      const child = spawn(program, [...lead, ...claudeArgs({ system, model })], { cwd: home, env, stdio: ['pipe', 'pipe', 'pipe'] });
+      const child = spawn(program, [...lead, ...claudeArgs({ system, model, stream })], { cwd: home, env, stdio: ['pipe', 'pipe', 'pipe'] });
       let out = '';
       let size = 0;
       let timedOut = false;
@@ -90,16 +107,27 @@ export async function runClaude({ prompt, system, token, model, timeoutMs, comma
         resolve(out);
       });
       child.stdin.on('error', () => {}); // it may exit before reading everything
-      child.stdin.end(prompt);
+      child.stdin.end(input);
     });
     let result;
     try {
-      result = JSON.parse(stdout);
+      // stream-json: one JSON object a line; the answer is the "result" one
+      result = stream
+        ? stdout.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l)).find((m) => m?.type === 'result')
+        : JSON.parse(stdout);
     } catch {
       throw new ClaudeError('bad-output', 'Claude Code’s output wasn’t JSON.');
     }
     if (result?.is_error || result?.subtype !== 'success' || typeof result.result !== 'string') {
       throw new ClaudeError('failed', 'Claude Code reported an error.');
+    }
+    // Token counts for the logs (never content): DESIGN.md asks for real numbers from the start
+    if (onUsage && result.usage) {
+      const u = result.usage;
+      onUsage({
+        input: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+        output: u.output_tokens ?? 0,
+      });
     }
     return result.result;
   } finally {

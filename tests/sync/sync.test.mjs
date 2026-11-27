@@ -882,6 +882,21 @@ describe('sync: slide files (#108)', () => {
     expect(db.prepare('SELECT COUNT(*) AS n FROM files').get().n).toBe(0);
   });
 
+  it('takes page readings (#168), the id they’re stored under included', async () => {
+    const b = browser();
+    await signIn(b, NATHAN);
+    const at = '2026-11-26T01:00:00.000Z';
+    const id = 'reading-0b3c1c3e-5d1e-4f4a-9a77-1c2d3e4f5a6b-58'; // pageReadingId(deck, page)
+    const res = await b.send('POST', '/api/changes', {
+      changes: [
+        { id: 'r1', entity: 'pageReading', entityId: id, op: 'put', at, iv: 'aaaaaaaaaaaaaaaa', ct: 'sealed' },
+        { id: 'r2', entity: 'pageReading', entityId: id, op: 'delete', at, iv: 'aaaaaaaaaaaaaaaa', ct: 'sealed' },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).stored).toBe(2);
+  });
+
   it('takes class materials and exam styles (#120); a material deleted on a device takes its files with it', async () => {
     const b = browser();
     await signIn(b, NATHAN);

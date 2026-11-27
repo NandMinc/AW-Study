@@ -4,6 +4,8 @@
 //   GET  /ai/signin?then=<path>: where "Sign in for AI" goes; a page linking back into the app
 //   GET  /ai/whoami: for setting up (JSON: who you are, whether you're ready, today's count)
 //   GET  /healthz: for the container's health check (no sign-in, says nothing)
+//   POST /ai/work, GET /ai/work/<id>, POST /ai/work/<id>/now, GET /ai/results, POST /ai/results/confirm:
+//        AI work in the background (#166, helper/queue.mjs), when it's switched on
 //
 // For each request: check it's JSON from our own site, check the Access token and find the person,
 // check the input, check their limits, run Claude Code with their own token, check the reply's
@@ -11,8 +13,11 @@
 import { AccessError } from './access.mjs';
 import { ClaudeError, runClaude } from './claude.mjs';
 import { InputError, JOBS, ReplyError, systemPrompt } from './jobs.mjs';
+import { validateWork, WorkError } from './queue.mjs';
 
 export const MAX_BODY = 512 * 1024;
+/** POST /ai/work: a section's pages with their pictures (about 100-300 KB each as PNG, base64url). */
+export const MAX_WORK_BODY = 32 * 1024 * 1024;
 
 /**
  * The models a request may ask for by name (`"model"` in its JSON), to compare them on the same slides.
@@ -34,6 +39,7 @@ export const MODELS = ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5
  * @param {object} [options.extraEnv]  (tests only)
  * @param {(line: object) => void} [options.log]
  * @param {() => Date} [options.now]
+ * @param {ReturnType<import('./queue.mjs').createQueue>} [options.queue]  background work; without it /ai/work answers 501
  */
 export function createHelper(options) {
   const { checkAccess, appOrigin, model, dailyLimit, timeoutMs } = options;
@@ -44,6 +50,7 @@ export function createHelper(options) {
   const people = new Map(options.people.map((p) => [p.email.toLowerCase(), p]));
   const used = new Map(); // label -> { day, count }
   const busy = new Set(); // labels with a request running
+  const queue = options.queue ?? null; // background work (./queue.mjs), or null: switched off
 
   return async function handle(req, res) {
     const started = Date.now();
@@ -99,6 +106,65 @@ export function createHelper(options) {
       }
       return sendPage(res, status, message, returnPath(url.searchParams.get('then')));
     }
+    // --- AI work in the background (#166, ./queue.mjs) ---
+    // "confirm" is tried before an id, or results/confirm would read as a result called "confirm"
+    const workPath = url.pathname.match(/^\/ai\/(work|results)(?:\/(confirm)|\/([\w-]{1,64})(?:\/(now))?)?$/);
+    if (workPath) {
+      const [, area, confirmPath, id, now_] = workPath;
+      if (!queue) return send(501, { error: 'Background AI work isn’t switched on yet.' });
+      const write = req.method === 'POST';
+      if (!write && req.method !== 'GET') return send(405, { error: 'Use GET or POST.' });
+      if (write) {
+        const origin = req.headers.origin;
+        if (origin !== undefined && origin !== appOrigin) return send(403, { error: 'Wrong site.' });
+        if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) return send(415, { error: 'Send JSON.' });
+      }
+      try {
+        const email = await checkAccess(req.headers);
+        person = people.get(email) ?? null;
+        if (!person) return send(403, { error: 'This account can’t use the AI helper.' });
+      } catch (err) {
+        if (err instanceof AccessError) return send(401, { error: err.message });
+        return send(503, { error: 'Couldn’t check the sign-in. Try again.' });
+      }
+      let body = null;
+      if (write) {
+        try {
+          body = JSON.parse(await readBody(req, area === 'work' && !id ? MAX_WORK_BODY : MAX_BODY));
+        } catch (err) {
+          if (err instanceof TooLarge) return send(413, { error: 'The request is too large.' });
+          return send(400, { error: 'The request isn’t valid JSON.' });
+        }
+      }
+      try {
+        if (area === 'work' && !id && write) return send(202, queue.submit(person.label, validateWork(body)));
+        if (area === 'work' && id && !now_ && !write) {
+          const state = queue.get(person.label, id);
+          return state ? send(200, state) : send(404, { error: 'Unknown work: send it again.', unknown: true });
+        }
+        if (area === 'work' && id && now_ && write) {
+          const state = queue.runNow(person.label, id);
+          return state ? send(200, state) : send(404, { error: 'Unknown work: send it again.', unknown: true });
+        }
+        if (area === 'results' && !id && !confirmPath && !write) {
+          const b64 = (bytes) => Buffer.from(bytes).toString('base64url');
+          const list = queue.resultsFor(person.label).map((r) => ({ ...r, sealed: { v: 1, epk: b64(r.sealed.epk), iv: b64(r.sealed.iv), ct: b64(r.sealed.ct) } }));
+          return send(200, { results: list });
+        }
+        if (area === 'results' && confirmPath && write) {
+          const ids = body?.ids;
+          if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500 || !ids.every((x) => typeof x === 'string' && /^[\w-]{1,64}$/.test(x))) {
+            return send(400, { error: 'ids: 1 to 500 result ids.' });
+          }
+          return send(200, { deleted: queue.confirm(person.label, ids) });
+        }
+        return send(404, { error: 'Not found.' });
+      } catch (err) {
+        if (err instanceof WorkError) return send(err.status, { error: err.message });
+        throw err;
+      }
+    }
+
     if (job === null || !Object.hasOwn(JOBS, job)) return send(404, { error: 'Not found.' });
     if (req.method !== 'POST') return send(405, { error: 'Use POST.' });
 

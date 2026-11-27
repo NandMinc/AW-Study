@@ -13,7 +13,7 @@ RUN npm install -g @anthropic-ai/claude-code@2.1.327 \
  && claude --version
 
 WORKDIR /app
-COPY access.mjs app.mjs claude.mjs jobs.mjs server.mjs ./
+COPY access.mjs app.mjs claude.mjs jobs.mjs queue.mjs reading.mjs rounds.mjs seal.mjs server.mjs ./
 
 ENV NODE_ENV=production \
     PORT=3001 \

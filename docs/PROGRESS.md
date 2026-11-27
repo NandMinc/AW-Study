@@ -78,7 +78,9 @@ slides" and "M6: AI helper and quizzes":
 | Design: read pictures at upload, and choose models by difficulty (reading and quizzes) | #151 | Nathan's Claude | `docs/DESIGN.md` ("Reading pictures and choosing models", a line of "Decisions so far") | **Done** (PR #152, Matt's OK). Built in its own issues, in the design's build order |
 | Reading pictures, step 1: model test (Haiku vs Sonnet vs Opus on real pages) | #155 | Nathan's Claude | new `tools/read-pages/` (the tool and the reading prompt), `tests/read-pages.test.mjs`, "Model test results" in `docs/DESIGN.md` | **Done** (this PR): a handout, a chemistry textbook and a statistics textbook |
 | Reading pictures, step 2: sort pages on the device, page fingerprints | #157 | Nathan's Claude | new `src/reading/` (`sort.ts`, `scan.ts`, tests, `calibrate.test.ts` skipped without real PDFs), optional `drawing`/`picture`/`noBar` in `src/viewer/test-pdf.ts` | **Done** (this PR). Not wired in yet: the queue (step 4) calls it |
-| Reading pictures, step 3: results keys | #161 | Nathan's Claude | `docs/SECURITY.md` ("AI work in the background", the threat table, "In short", "AI requests") first; then `src/lib/`, `src/types/crypto.ts`, `sync/` | Design **waiting for Matt's OK** (PR #162); crypto and server storage built (PR stacked on #162) |
+| Reading pictures, step 3: results keys | #161 | Nathan's Claude | `docs/SECURITY.md` ("AI work in the background", the threat table, "In short", "AI requests") first; then `src/lib/`, `src/types/crypto.ts`, `sync/` | **Done** (design PR #162 with Matt's OK, code PR #163) |
+| Reading pictures, step 4: the helper's queue (simulated batches, rounds, deadlines, daily limit) | #166 | Nathan's Claude | new `helper/queue.mjs`, `helper/seal.mjs`, the `/ai/work` and `/ai/results` routes in `helper/app.mjs`, `helper/Dockerfile`, `tests/helper/queue.test.mjs`, the work part of `tests/helper/helper.test.mjs` | **Done** (this PR). Switched off (501) until step 5 |
+| Reading pictures, step 5: the reading job (5a helper round, 5b storage, 5c the app sending pages) | #168 | Nathan's Claude | 5b: new `src/types/reading.ts`, `src/db/readings.ts` (+ test), schema step 10, `ENTITY_STORE` and the sync server's entities, the cascades in `src/db/lectures.ts`; 5a: `helper/rounds.mjs`, `helper/reading.mjs` (moved from `tools/read-pages`), image support in `helper/claude.mjs`, `helper/server.mjs`, `tests/helper/reading.test.mjs` | 5a **done** (PR #169); 5b **done** (this PR); 5c next |
 
 ## Milestones
 
@@ -170,6 +172,20 @@ the "Test and publish" run on `main` to finish, then press Update.
   that say which part of a formula is meant, and for each question to be read back and rewritten if awkward. Rerun:
   occurrences are named exactly ("the y inside the abstraction and the final x outside it"), and nothing awkward
   turned up. 4 deliberate breaks, all caught. **The helper changed: press Update for `honed-ai`.**
+- **Nov 26 (#168, 5b):** Storage for page readings: the contract `src/types/reading.ts` (one `PageReading` per deck page,
+  id `reading-<deck>-<page>` so it never collides with another record's), `src/db/readings.ts` (save replaces, list, get),
+  schema step 10 (`pageReadings`, by course and deck), synced as entity `pageReading` (app and server), deleted with their
+  deck or class. Sealed: only id, courseId and deckId readable. 33 tests; 4 deliberate breaks, all caught.
+- **Nov 26 (#168, 5a):** The helper's reading round, and the queue switched on (`HELPER_BACKGROUND`, batch delay 30 min,
+  margin 2 h, 300 pages a day by default). Haiku reads each picture page; hard kinds or an unreadable part go to Sonnet,
+  whose reading replaces Haiku's; one more ask for an unusable answer; pages already read skipped. `runClaude` takes a page
+  picture (stream-json, tools still off) and logs token counts. The reading prompt moved to `helper/reading.mjs`. Nothing
+  sends work until 5c. 5 tests; 5 deliberate breaks, all caught.
+- **Nov 26 (#166):** Reading pictures, step 4: the helper's queue, in memory. Rounds wait for the next simulated batch
+  unless that would miss the deadline; run now on a study session; a daily page limit that spreads work over days and wins
+  over deadlines; retries; results sealed to the account's results key (`helper/seal.mjs`, opened by the app's code in a
+  test). Routes `/ai/work`, `/ai/results` answer 501 until step 5. The tests found a real bug first: a tick with nothing
+  to await left the queue stuck for good (fixed with `.finally`). 23 + 4 tests; 7 deliberate breaks, all caught.
 - **Nov 26 (#161):** Results keys built (stacked on the design PR, merges after it): `src/lib/results-key.ts` (ECDH P-256 key
   pair, private part sealed with the data key and checked against the server's public key; results sealed with an
   ephemeral ECDH + HKDF-SHA-256 + AES-GCM bound to account and result id; HMAC-keyed fingerprints) and `/api/results-key`

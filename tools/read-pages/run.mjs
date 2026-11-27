@@ -1,5 +1,5 @@
 // The model test (#155): draws chosen PDF pages, sends each to several models with the reading prompt
-// (reading.mjs), and saves the answers side by side with their real token counts and the API price
+// (helper/reading.mjs), and saves the answers side by side with their real token counts and the API price
 // Claude Code reports, plus report.html to compare them by eye.
 //
 //   node tools/read-pages/run.mjs --pdf <file.pdf> --pages 1,8,11-12 --out <folder outside the repo>
@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
-import { needsStrongerModel, parseReading, readingPrompt, READING_SYSTEM } from './reading.mjs';
+import { needsStrongerModel, parseReading, readingPrompt, READING_SYSTEM } from '../../helper/reading.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 

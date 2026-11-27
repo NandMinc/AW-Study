@@ -25,6 +25,10 @@ const reply = replies[Math.min(calls, replies.length - 1)];
 
 if (reply.sleep) await new Promise((resolve) => setTimeout(resolve, reply.sleep));
 if (reply.exit !== undefined) process.exit(reply.exit);
+// With --output-format stream-json (a page to read, #168): JSON lines, the answer in the "result" one, with usage
+const stream = process.argv.includes('stream-json');
+const usage = { input_tokens: 2, cache_creation_input_tokens: 2900, output_tokens: 400 };
+const line = (o) => (stream ? `${JSON.stringify({ type: 'system', subtype: 'init', tools: [] })}\n${JSON.stringify(o)}\n` : JSON.stringify(o));
 if (reply.raw !== undefined) process.stdout.write(reply.raw);
-else if (reply.error) process.stdout.write(JSON.stringify({ type: 'result', subtype: 'error_during_execution', is_error: true }));
-else process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: reply.result }));
+else if (reply.error) process.stdout.write(line({ type: 'result', subtype: 'error_during_execution', is_error: true }));
+else process.stdout.write(line({ type: 'result', subtype: 'success', is_error: false, result: reply.result, usage }));
