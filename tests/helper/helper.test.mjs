@@ -616,6 +616,22 @@ describe('exam style (#121)', () => {
     expect(calls()[0].stdin).not.toContain('short-answer');
   });
 
+  it('questions: wrong options as long and detailed as the right one; summary slides skipped like titles (#158)', async () => {
+    const written = { question: 'Why do covalent bonds form?', points: ['atoms share electrons'], page: 21 };
+    await start([reply({ questions: [choice(1)] }), reply({ questions: [written] })]);
+    await post('questions', { pages: SLIDES, count: 1 });
+    await post('written', { pages: SLIDES, count: 1 });
+    const [questions, writtenPrompt] = calls().map((c) => instructions(c.stdin));
+    expect(questions).toContain('Make the wrong options as long and as detailed as the right one');
+    expect(questions).toContain('the right option must not be the longest more often than the others');
+    // Summary and recap slides repeat what's taught elsewhere: both question jobs skip them
+    for (const prompt of [questions, writtenPrompt]) {
+      expect(prompt).toContain('summary, recap or "what we learned"');
+      expect(prompt).toContain('title, agenda or contents, learning objectives, section dividers');
+    }
+    expect(questions).toContain('references or credits; put those questions on the other slides instead.');
+  });
+
   it('questions with a mix: the counts in the prompt; short ones always level 3, with 1 to 3 points; extras dropped', async () => {
     await start([reply({ questions: [short({ level: 2 }), choice(1), choice(2, 21, 2), short({ question: 'An extra short one?' }), choice(3, 22, 3)] })]);
     const body = await (await post('questions', { pages: SLIDES, count: 4, mix: MIX })).json();

@@ -72,6 +72,7 @@ slides" and "M6: AI helper and quizzes":
 | Nav bar: hover rings the icon, the pill moves only with the page | #147 | Matt's Claude | the nav bar styles in `src/app.css`, the pill tests in `tests/browsers/look.spec.ts`, the nav bar part of `docs/design/README.md` | **Done** (PR #148) |
 | Animate the site, step 2: page transitions | #149 | Matt's Claude | new `src/ui/page-motion.ts` (+ test), the screen's wrapper and `usePageMotion` in `src/App.tsx`, the page transition styles in `src/app.css`, reduced motion by default in `playwright.config.ts`, `tests/browsers/motion.spec.ts`, the motion part of `docs/design/README.md` | **Done** (PR #150) |
 | Animate the site, step 3: ticking off a task | #153 | Matt's Claude | new `src/ui/tick-memory.ts` (+ test), `fresh` on `Tick` in `src/ui/TasksScreen.tsx`, the tick styles in `src/app.css`, the tick tests in `tests/browsers/motion.spec.ts`, the Tasks part of `docs/design/README.md` | **Done** (PR #154) |
+| Question prompts: wrong options as long as the right one; skip summary slides | #158 | Matt's Claude | the `questions` and `written` prompts in `helper/jobs.mjs` (`SKIP_SLIDES`), `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (PR #159). **The helper changed: press Update for `honed-ai`** |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 | Design: read pictures at upload, and choose models by difficulty (reading and quizzes) | #151 | Nathan's Claude | `docs/DESIGN.md` ("Reading pictures and choosing models", a line of "Decisions so far") | **Done** (PR #152, Matt's OK). Built in its own issues, in the design's build order |
 | Reading pictures, step 1: model test (Haiku vs Sonnet vs Opus on real pages) | #155 | Nathan's Claude | new `tools/read-pages/` (the tool and the reading prompt), `tests/read-pages.test.mjs`, "Model test results" in `docs/DESIGN.md` | **Done** (this PR): a handout, a chemistry textbook and a statistics textbook |
@@ -156,6 +157,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 27 (#158):** Two prompt fixes from running the `questions` job on one of Matt's lectures (24 slides, 70 questions,
+  Opus 5.5; every answer was right). (1) The right option gave itself away by length: it was at least 25% longer than
+  every wrong one in 19 of 70 questions. The prompt now asks for wrong options as long and detailed as the right one:
+  **19 became 2**, and on average the right option went from 1.15 times the wrong ones' length to 0.95. (2) The summary
+  slide got 3 questions repeating ones asked where the ideas are taught. Summary, recap and learning-objectives slides
+  are now skipped like title slides (`SKIP_SLIDES`, in both question jobs): **3 became 0**. Levels unchanged (18/24/28).
+  **The helper changed: press Update for `honed-ai`.**
 
 - **Nov 26 (#155):** Reading pictures, step 1: the model test. `tools/read-pages/run.mjs` draws PDF pages and compares
   models on the reading prompt (`reading.mjs`, with `parseReading` and `needsStrongerModel`, tests in
