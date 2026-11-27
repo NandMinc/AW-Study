@@ -1,5 +1,5 @@
-// The reading job's prompt and its answer check (DESIGN.md "Reading pictures and choosing models", #151).
-// The model test (#155) uses it as is; build step 5 moves it into the helper's jobs.
+// The reading job's prompt and its answer check (DESIGN.md "Reading pictures and choosing models", #151; moved
+// from tools/read-pages in #168, which still uses it for the model test).
 //
 // One page at a time: the page's picture plus the text PDF.js already found on it. The answer is what that
 // text misses: words that are only in pictures, and what each diagram means, so quizzes, Explain and Ask
@@ -27,6 +27,11 @@ export function readingPrompt(pageText) {
     : 'This page has no selectable text: everything on it is in the picture. Read the picture of the page and reply with the JSON.';
 }
 
+/** An answer that isn't a usable reading (the round asks once more). */
+export class ReadingError extends Error {
+  name = 'ReadingError';
+}
+
 export const READING_LIMITS = { pictureText: 20_000, figures: 30, label: 200, description: 2_000, unsureWhy: 300 };
 
 /**
@@ -37,36 +42,36 @@ export function parseReading(raw) {
   const s = String(raw ?? '');
   const start = s.indexOf('{');
   const end = s.lastIndexOf('}');
-  if (start < 0 || end < start) throw new Error('No JSON object in the answer.');
+  if (start < 0 || end < start) throw new ReadingError('No JSON object in the answer.');
   let v;
   try {
     v = JSON.parse(s.slice(start, end + 1));
   } catch {
-    throw new Error('The answer is not valid JSON.');
+    throw new ReadingError('The answer is not valid JSON.');
   }
-  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('The answer is not a JSON object.');
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new ReadingError('The answer is not a JSON object.');
   const str = (x, name, max) => {
-    if (typeof x !== 'string') throw new Error(`${name} must be text.`);
-    if (x.length > max) throw new Error(`${name} is too long (at most ${max} characters).`);
+    if (typeof x !== 'string') throw new ReadingError(`${name} must be text.`);
+    if (x.length > max) throw new ReadingError(`${name} is too long (at most ${max} characters).`);
     return x.trim();
   };
   const pictureText = str(v.pictureText ?? '', 'pictureText', READING_LIMITS.pictureText);
-  if (!Array.isArray(v.figures)) throw new Error('figures must be a list.');
-  if (v.figures.length > READING_LIMITS.figures) throw new Error(`At most ${READING_LIMITS.figures} figures.`);
+  if (!Array.isArray(v.figures)) throw new ReadingError('figures must be a list.');
+  if (v.figures.length > READING_LIMITS.figures) throw new ReadingError(`At most ${READING_LIMITS.figures} figures.`);
   const figures = v.figures.map((f, i) => {
-    if (!f || typeof f !== 'object') throw new Error(`figures[${i}] must be an object.`);
+    if (!f || typeof f !== 'object') throw new ReadingError(`figures[${i}] must be an object.`);
     const label = str(f.label ?? '', `figures[${i}].label`, READING_LIMITS.label);
     const description = str(f.description, `figures[${i}].description`, READING_LIMITS.description);
-    if (!description) throw new Error(`figures[${i}] has no description.`);
+    if (!description) throw new ReadingError(`figures[${i}] has no description.`);
     return { label, description };
   });
-  if (!Array.isArray(v.kinds) || v.kinds.some((k) => !KINDS.includes(k))) throw new Error(`kinds must be a list from: ${KINDS.join(', ')}.`);
+  if (!Array.isArray(v.kinds) || v.kinds.some((k) => !KINDS.includes(k))) throw new ReadingError(`kinds must be a list from: ${KINDS.join(', ')}.`);
   const kinds = [...new Set(v.kinds)];
-  if (typeof v.decorativeOnly !== 'boolean') throw new Error('decorativeOnly must be true or false.');
-  if (typeof v.unsure !== 'boolean') throw new Error('unsure must be true or false.');
+  if (typeof v.decorativeOnly !== 'boolean') throw new ReadingError('decorativeOnly must be true or false.');
+  if (typeof v.unsure !== 'boolean') throw new ReadingError('unsure must be true or false.');
   const unsureWhy = v.unsure ? str(v.unsureWhy ?? '', 'unsureWhy', READING_LIMITS.unsureWhy) : '';
   // Decoration only means nothing to add: drop anything that says otherwise rather than trust half of it.
-  if (v.decorativeOnly && (pictureText || figures.length)) throw new Error('decorativeOnly with picture text or figures.');
+  if (v.decorativeOnly && (pictureText || figures.length)) throw new ReadingError('decorativeOnly with picture text or figures.');
   return { pictureText, figures, kinds, decorativeOnly: v.decorativeOnly, unsure: v.unsure, unsureWhy };
 }
 

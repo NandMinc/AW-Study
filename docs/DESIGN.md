@@ -492,8 +492,9 @@ by" less the margin, then runs straight away; this one rule gives "a third batch
 with room for all its pages and wins over deadlines and run now; a job bigger than a day's limit is refused (split
 it). Three tries a round, then given up; jobs forgotten after 7 days, unfetched results after 30. A restart loses waiting
 work: the device finds its job unknown (404, `unknown: true`) and sends it again. Results are sealed by `helper/seal.mjs`
-(the app's construction, checked by a test that opens it with `src/lib/results-key.ts`). The routes answer 501 until
-step 5 gives the queue its first real round.
+(the app's construction, checked by a test that opens it with `src/lib/results-key.ts`). The routes answered 501 until
+step 5a (#168) gave the queue its first real round, `read` (`helper/rounds.mjs`); it's on by default
+(`HELPER_BACKGROUND=off` turns it off), with a 30-minute simulated batch, a 2-hour margin and 300 pages a person a day.
 
 **Quizzes by difficulty too** (Nathan, Nov 26: "hard content could call on a higher model as needed, while using a lower
 model when possible").
