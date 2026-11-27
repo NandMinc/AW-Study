@@ -530,6 +530,8 @@ model when possible").
   read; its plan is `planBank`'s, with an unread picture page counted as an average page (150 words) since its reading
   arrives in the same job. Banks filled while the app was open are only topped up to their levels. The Quiz page still
   makes questions itself when a bank is empty: step 8 has it say they're being written instead.
+- **Built (#175, step 7):** Explain and Ask send the slides with their readings, read a slide with pictures now when it
+  hasn't been (and save it), and send a box as a picture of its area (`src/reading/explain.ts`).
 - **The helper chooses the model, never the student.** Settings' Compare models (#79) stays for us to test with.
 
 **Cost per student per month** (estimates, about ±50%; Nov 26 API prices per million tokens in/out: Haiku 5.5 $0.10/$0.50,

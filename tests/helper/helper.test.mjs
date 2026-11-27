@@ -872,3 +872,54 @@ describe('AI work in the background (#166)', () => {
     expect((await call('results/confirm', { method: 'POST', body: { ids: ['a'], pad: huge } })).status).toBe(413);
   });
 });
+
+describe('pictures: a box for Explain and Ask, a page read now (#175)', () => {
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 5, 5]).toString('base64url');
+  const modelOf = (c) => c.argv[c.argv.indexOf('--model') + 1];
+  const message = (c) => JSON.parse(c.stdin).message.content;
+
+  it('explains a box with no words from its picture, sent as an image beside the prompt', async () => {
+    await start([{ result: '{"text": "A histogram with heavy tails."}' }]);
+    const res = await post('explain', { selection: '', slides: SLIDES, image: PNG });
+    expect(await res.json()).toEqual({ text: 'A histogram with heavy tails.' });
+    const [call] = calls();
+    expect(call.argv).toContain('stream-json');
+    const [image, text] = message(call);
+    expect(image).toEqual({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: Buffer.from(PNG, 'base64url').toString('base64') } });
+    expect(text.text).toContain('the part of the slide the student boxed');
+    expect(text.text).not.toContain(`"image"`); // never inside DATA
+  });
+
+  it('still needs words to explain without a picture, and asks about a box with its picture', async () => {
+    await start([{ result: '{"text": "Because the tails are heavy."}' }]);
+    expect((await post('explain', { selection: '', slides: SLIDES })).status).toBe(400);
+    expect(await (await post('ask', { question: 'Why leptokurtic?', selection: '', slides: SLIDES, image: PNG })).json()).toEqual({ text: 'Because the tails are heavy.' });
+    expect(message(calls()[0])[1].text).toContain('boxed and is asking about');
+  });
+
+  it('refuses a picture that isn’t a PNG', async () => {
+    await start([]);
+    const gif = Buffer.from('GIF89a').toString('base64url');
+    expect((await post('explain', { selection: 'x', slides: SLIDES, image: gif })).status).toBe(400);
+    expect((await post('read', { text: 'x', image: gif })).status).toBe(400);
+    expect(calls()).toEqual([]);
+  });
+
+  it('reads a page now: Haiku, then Sonnet for hard content', async () => {
+    const reading = (kinds) => JSON.stringify({ pictureText: '', figures: [{ label: 'Figure 2.4', description: 'Methanol.' }], kinds, decorativeOnly: false, unsure: false, unsureWhy: '' });
+    await start([{ result: reading(['diagram']) }]);
+    expect(await (await post('read', { text: 'Polar bonds', image: PNG })).json()).toMatchObject({ model: 'claude-haiku-5-5', reading: { kinds: ['diagram'] } });
+    rmSync(join(dir, 'calls.jsonl'));
+    await start([{ result: reading(['chemistry']) }, { result: reading(['chemistry']) }]);
+    expect(await (await post('read', { text: 'Polar bonds', image: PNG })).json()).toMatchObject({ model: 'claude-sonnet-5-5' });
+    expect(calls().map(modelOf)).toEqual(['claude-haiku-5-5', 'claude-sonnet-5-5']);
+    expect((await post('read', { text: 'no picture' })).status).toBe(400);
+  });
+
+  it('takes a large picture for these jobs only', async () => {
+    await start([{ result: '{"text": "ok"}' }]);
+    const big = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(MAX_BODY)]).toString('base64url');
+    expect((await post('explain', { selection: 'x', slides: SLIDES, image: big })).status).toBe(200);
+    expect((await post('questions', { pages: SLIDES, count: 1, pad: big })).status).toBe(413);
+  });
+});

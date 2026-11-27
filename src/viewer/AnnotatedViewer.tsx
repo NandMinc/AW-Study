@@ -36,6 +36,11 @@ export interface AnnotatedViewerProps extends Omit<SlideViewerProps, 'overlay' |
   ai?: Pick<AiBackend, 'explain' | 'ask'>;
   /** The deck's text, one string per page: the slides sent with Explain and Ask. */
   pageTexts?: readonly string[];
+  /**
+   * What Explain and Ask send (#175, src/reading/explain.ts): the slides with what the AI read on their pictures,
+   * and for a box, a picture of it. Without it, the slides' text alone, and a box with no words can't be explained.
+   */
+  prepare?: (page: number, area?: PageRect, signal?: AbortSignal) => Promise<{ slides: SlideText[]; image?: Uint8Array }>;
 }
 
 type Tool = 'select' | 'area' | 'pin';
@@ -54,6 +59,8 @@ interface AiJob {
   selection: string;
   /** Where Keep as note puts the answer: on this annotation, or a new one from `pending`. */
   annotationId?: string;
+  /** A box: its area, sent as a picture (#175). */
+  area?: PageRect;
   pending?: Pending;
   question: string;
   answer: string | null;
@@ -68,7 +75,7 @@ const SLIDE_TEXT_MAX = 8_000; // and for a slide's text
 const NOTE_MAX = 10_000;
 const MIN_BOX = 0.01; // a box smaller than 1% of the page each way is a slip, not a box
 
-export function AnnotatedViewer({ notes, ai, pageTexts, page: wanted = 1, onPageChange, ...viewer }: AnnotatedViewerProps) {
+export function AnnotatedViewer({ notes, ai, pageTexts, prepare, page: wanted = 1, onPageChange, ...viewer }: AnnotatedViewerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [current, setCurrent] = useState(wanted);
   const [tool, setTool] = useState<Tool>('select');
@@ -83,6 +90,8 @@ export function AnnotatedViewer({ notes, ai, pageTexts, page: wanted = 1, onPage
   const pressing = useRef(false);
   const openOnRelease = useRef(false);
   const canAsk = !!ai && !!pageTexts && pageTexts.length > 0;
+  /** A box can be explained from its picture even with no words in it (#175). */
+  const canPicture = canAsk && !!prepare;
 
   useEffect(() => setCurrent(wanted), [wanted]);
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -162,7 +171,7 @@ export function AnnotatedViewer({ notes, ai, pageTexts, page: wanted = 1, onPage
       .map((n) => ({ page: n, text: (pageTexts![n - 1] ?? '').slice(0, SLIDE_TEXT_MAX) }))
       .filter((s) => s.page === page || s.text.trim() !== '');
 
-  const startJob = (mode: AiJob['mode'], from: { page: number; selection: string; annotationId?: string; pending?: Pending }) => {
+  const startJob = (mode: AiJob['mode'], from: { page: number; selection: string; annotationId?: string; pending?: Pending; area?: PageRect }) => {
     abortRef.current?.abort();
     const next: AiJob = { mode, ...from, selection: from.selection.slice(0, SELECTION_MAX), question: '', answer: null, busy: false, problem: null, signIn: false };
     setJob(next);
@@ -177,11 +186,12 @@ export function AnnotatedViewer({ notes, ai, pageTexts, page: wanted = 1, onPage
     abortRef.current = controller;
     setJob({ ...target, busy: true, problem: null, signIn: false, answer: null });
     try {
-      const slides = slidesAround(target.page);
+      const { slides, image } = prepare ? await prepare(target.page, target.area, controller.signal) : { slides: slidesAround(target.page), image: undefined };
+      const picture = image ? { image } : {};
       const answer =
         target.mode === 'explain'
-          ? await ai.explain({ selection: target.selection, slides }, controller.signal)
-          : await ai.ask({ question: target.question.trim(), selection: target.selection, slides }, controller.signal);
+          ? await ai.explain({ selection: target.selection, slides, ...picture }, controller.signal)
+          : await ai.ask({ question: target.question.trim(), selection: target.selection, slides, ...picture }, controller.signal);
       if (!controller.signal.aborted) setJob({ ...target, busy: false, answer });
     } catch (err) {
       if (controller.signal.aborted || (err instanceof AiError && err.code === 'cancelled')) return;
@@ -298,8 +308,9 @@ export function AnnotatedViewer({ notes, ai, pageTexts, page: wanted = 1, onPage
               pending={pending}
               canAsk={canAsk}
               onSave={save}
-              onExplain={() => startJob('explain', { page: pending.page, selection: pending.text, pending })}
-              onAsk={() => startJob('ask', { page: pending.page, selection: pending.text, pending })}
+              canPicture={canPicture}
+              onExplain={() => startJob('explain', { page: pending.page, selection: pending.text, pending, ...(pending.kind === 'area' && { area: pending.rects[0] }) })}
+              onAsk={() => startJob('ask', { page: pending.page, selection: pending.text, pending, ...(pending.kind === 'area' && { area: pending.rects[0] }) })}
               onCancel={() => {
                 setPending(null);
                 document.getSelection()?.removeAllRanges();
@@ -337,8 +348,9 @@ export function AnnotatedViewer({ notes, ai, pageTexts, page: wanted = 1, onPage
                   onActivate={() => setActiveId(a.id)}
                   onChange={(change) => run(() => notes.update(a.id, change))}
                   onDelete={() => run(() => notes.remove(a.id))}
-                  onExplain={(selection) => startJob('explain', { page: a.page, selection, annotationId: a.id })}
-                  onAsk={(selection) => startJob('ask', { page: a.page, selection, annotationId: a.id })}
+                  canPicture={canPicture}
+                  onExplain={(selection) => startJob('explain', { page: a.page, selection, annotationId: a.id, ...(a.kind === 'area' && { area: a.rects[0] }) })}
+                  onAsk={(selection) => startJob('ask', { page: a.page, selection, annotationId: a.id, ...(a.kind === 'area' && { area: a.rects[0] }) })}
                   wordsOf={() => wordsOf(a, rootRef.current)}
                 />
               ))}
@@ -482,6 +494,7 @@ function ColourButtons({ label, current, onPick }: { label: (name: string) => st
 function PendingCard({
   pending,
   canAsk,
+  canPicture,
   onSave,
   onExplain,
   onAsk,
@@ -489,6 +502,7 @@ function PendingCard({
 }: {
   pending: Pending;
   canAsk: boolean;
+  canPicture: boolean;
   onSave: (colour: AnnotationColour, note?: string) => Promise<void>;
   onExplain: () => void;
   onAsk: () => void;
@@ -537,7 +551,7 @@ function PendingCard({
         </div>
       )}
       <div className="row">
-        {canAsk && pending.text && (
+        {canAsk && (pending.text || (pending.kind === 'area' && canPicture)) && (
           <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onExplain}>
             Explain this
           </button>
@@ -570,7 +584,7 @@ function AiCard({
 }) {
   return (
     <section className="ann-card ann-ai" aria-label={job.mode === 'explain' ? 'Explanation' : 'Question for the AI'} aria-busy={job.busy}>
-      <h3 className="ann-heading">{job.mode === 'explain' ? 'Explain this' : job.selection ? 'Ask about this' : `Ask about slide ${job.page}`}</h3>
+      <h3 className="ann-heading">{job.mode === 'explain' ? 'Explain this' : job.selection || job.area ? 'Ask about this' : `Ask about slide ${job.page}`}</h3>
       {job.selection && <p className="ann-quote">“{excerpt(job.selection)}”</p>}
       {job.mode === 'ask' && (
         <form
@@ -625,6 +639,7 @@ function AnnotationItem({
   annotation: a,
   active,
   canAsk,
+  canPicture,
   onActivate,
   onChange,
   onDelete,
@@ -635,6 +650,8 @@ function AnnotationItem({
   annotation: Annotation;
   active: boolean;
   canAsk: boolean;
+  /** A box can be explained from its picture (#175), words or not. */
+  canPicture: boolean;
   onActivate: () => void;
   onChange: (change: AnnotationChange) => Promise<boolean>;
   onDelete: () => Promise<boolean>;
@@ -692,7 +709,7 @@ function AnnotationItem({
           </button>
         )}
         {canAsk && a.kind !== 'note' && (
-          <button type="button" onClick={() => onExplain(wordsOf())} disabled={!wordsOf()}>
+          <button type="button" onClick={() => onExplain(wordsOf())} disabled={!wordsOf() && !(a.kind === 'area' && canPicture)}>
             Explain this
           </button>
         )}

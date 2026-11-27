@@ -1,7 +1,8 @@
 // A deck's slides with its notes and highlights (#56): the viewer (src/viewer/AnnotatedViewer.tsx)
 // joined to the store and the AI. Used wherever slides are studied: the Slides screen and a study
 // session (Play). Annotations belong to the deck's pages, so the same ones show in both.
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+import { prepareAi } from '../reading/explain';
 import type { AnnotationChange, AnnotationInput } from '../types/annotation';
 import { AnnotatedViewer, type ViewerNotes } from '../viewer/AnnotatedViewer';
 import type { SlideRange } from '../viewer/SlideViewer';
@@ -47,5 +48,9 @@ export function DeckSlides({
     [list, after, store, deckId],
   );
 
-  return <AnnotatedViewer pdf={pdf} page={page} range={range} onPageChange={onPageChange} notes={notes} ai={ai} pageTexts={pageTexts ?? undefined} />;
+  // Explain and Ask send the slides with what the AI read on their pictures, and a box's picture (#175)
+  const prepare = useMemo(() => (pageTexts ? prepareAi({ store, ai, deckId, pdf, pageTexts }) : undefined), [store, ai, deckId, pdf, pageTexts]);
+  useEffect(() => () => void prepare?.close(), [prepare]);
+
+  return <AnnotatedViewer pdf={pdf} page={page} range={range} onPageChange={onPageChange} notes={notes} ai={ai} pageTexts={pageTexts ?? undefined} prepare={prepare} />;
 }

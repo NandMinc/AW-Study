@@ -346,3 +346,40 @@ test('on a phone the Slides page is just the slides; on a computer nothing moves
   }
   expect(await problems()).toEqual([]);
 });
+
+test('a box with no words in it can be explained and asked about: its picture goes to the AI (#175)', async ({ page }) => {
+  const problems = await watchProblems(page);
+  const sent: { job: string; body: Record<string, unknown> }[] = [];
+  for (const job of ['explain', 'ask']) {
+    await page.route(`**/ai/${job}`, async (route) => {
+      sent.push({ job, body: route.request().postDataJSON() });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: `The ${job} answer.` }) });
+    });
+  }
+  await openSection(page);
+  await page.getByRole('button', { name: 'Slide 3', exact: true }).click();
+  await shown(page, 3);
+  const notes = await panel(page);
+  // A box over an empty part of the slide (below the words), saved
+  await notes.getByRole('button', { name: 'Box' }).click();
+  await dragOnSlide(page, [0.1, 0.5], [0.9, 0.75]);
+  await expect(notes.getByRole('group', { name: 'New box' })).toContainText('A box on slide 3');
+  await notes.getByRole('button', { name: 'Highlight blue' }).click();
+  const box = notes.getByTestId('annotation').filter({ hasText: 'Box' });
+  // Its Explain works (it used to be greyed out), and sends the box's picture
+  await expect(box.getByRole('button', { name: 'Explain this' })).toBeEnabled();
+  await box.getByRole('button', { name: 'Explain this' }).click();
+  await expect(notes.getByTestId('ai-answer')).toHaveText('The explain answer.');
+  const explained = sent[0]!.body as { selection: string; image: string; slides: { page: number }[] };
+  expect(explained.selection).toBe('');
+  expect(Buffer.from(explained.image, 'base64url').subarray(0, 4)).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  expect(explained.slides.map((s) => s.page)).toEqual([2, 3, 4]);
+  // Its Ask is about the box, not the whole slide
+  await box.getByRole('button', { name: 'Ask about this' }).click();
+  await expect(notes.getByRole('heading', { name: 'Ask about this', exact: true })).toBeVisible();
+  await notes.getByLabel('Your question').fill('What goes here?');
+  await notes.getByRole('button', { name: 'Ask', exact: true }).click();
+  await expect(notes.getByTestId('ai-answer')).toHaveText('The ask answer.');
+  expect((sent[1]!.body as { image?: string }).image).toBeTruthy();
+  expect(await problems()).toEqual([]);
+});

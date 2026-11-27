@@ -137,6 +137,20 @@ function mix(value, count) {
   return { choice, short };
 }
 
+/**
+ * An optional picture for Explain and Ask (#175): a box drawn over part of a slide, as a PNG in base64url. It goes to
+ * Claude as an image beside the prompt, never inside DATA.
+ */
+export const PICTURE_MAX = 4 * 1024 * 1024;
+function picture(value) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string' || !/^[\w-]+$/.test(value)) fail('image must be a PNG in base64url.');
+  const bytes = new Uint8Array(Buffer.from(value, 'base64url'));
+  if (bytes.length > PICTURE_MAX) fail(`image: at most ${PICTURE_MAX} bytes.`);
+  if (!(bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47)) fail('image must be a PNG.');
+  return bytes;
+}
+
 function object(body) {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) fail('The request must be a JSON object.');
   return body;
@@ -497,16 +511,24 @@ export const JOBS = {
   explain: {
     validate(body) {
       object(body);
-      return { selection: str(body.selection, 'selection', LIMITS.selection), slides: pages(body.slides, 'slides', 5) };
+      const image = picture(body.image);
+      return {
+        // A box over a picture may hold no words: then the picture is what's explained
+        selection: str(body.selection, 'selection', LIMITS.selection, { empty: image !== undefined }),
+        slides: pages(body.slides, 'slides', 5),
+        ...(image && { image }),
+      };
     },
     prompt(input) {
+      const { image, ...data } = input;
       return buildPrompt(
         [
           'Explain DATA.selection, which the student selected on one of DATA.slides (the slide and its neighbours).',
+          ...(image ? ['The attached picture is the part of the slide the student boxed; DATA.selection holds any words it contains. Explain what the picture shows.'] : []),
           'Explain it more fully than the slide does, in plain words, in a short paragraph or two, as a good tutor would. Use the slides for context.',
           'Reply with: {"text": string}',
         ].join('\n'),
-        input,
+        data,
       );
     },
     check(text) {
@@ -522,20 +544,38 @@ export const JOBS = {
         question: str(body.question, 'question', LIMITS.shortText),
         selection: str(body.selection, 'selection', LIMITS.selection, { optional: true, empty: true }) ?? '',
         slides: pages(body.slides, 'slides', 5),
+        ...(picture(body.image) && { image: picture(body.image) }),
       };
     },
     prompt(input) {
+      const { image, ...data } = input;
       return buildPrompt(
         [
           'Answer the student\'s question (DATA.question) about DATA.slides, and about DATA.selection if it isn\'t empty.',
+          ...(image ? ['The attached picture is the part of the slide the student boxed and is asking about; DATA.selection holds any words it contains.'] : []),
           'Answer in plain words, in a short paragraph or two. If the slides don\'t cover it, say so and answer from general knowledge.',
           'Reply with: {"text": string}',
         ].join('\n'),
-        input,
+        data,
       );
     },
     check(text) {
       return { text: replyText(replyObject(text).text, 'Text', 4_000) };
+    },
+  },
+
+  /**
+   * Reads one page now (#175): Explain or Ask on a page the batch hasn't read yet. The picture and text in; the
+   * reading out, from helper/rounds.mjs readPage (Haiku, then Sonnet for hard content). `custom`: the app runs it
+   * with readPage instead of one prompt and one check.
+   */
+  read: {
+    custom: true,
+    validate(body) {
+      object(body);
+      const image = picture(body.image);
+      if (!image) fail('image: the page as a PNG.');
+      return { page: 1, text: str(body.text ?? '', 'text', 20_000, { empty: true }), image };
     },
   },
 };

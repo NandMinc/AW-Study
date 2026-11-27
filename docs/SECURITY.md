@@ -161,7 +161,8 @@ AI is the one time data leaves the device. Everything else in this document is a
   sent unless the user asks for that job ("Make questions").
   **Designed (#151, #161):** reading a page's pictures sends that page drawn as an image (about 1,200 px) with its
   text; with an account, the covered pages are sent when the student says what a lecture covered, and the work
-  happens in the background ("AI work in the background").
+  happens in the background ("AI work in the background"). Explain and Ask may send a box as a picture of its area, and read a slide
+  with pictures now (#175), with the same helper rules.
 - **Where to:** `/ai/` on our own site only (`connect-src 'self'`), over HTTPS. Cloudflare (its edge
   and Access) and the tunnel carry it to the helper on Nathan's server (`helper/`), which sends it
   to Anthropic through Claude Code, on the asking person's own subscription.
