@@ -17,10 +17,11 @@ import type { EncryptedRecord } from '../types/crypto';
 import type { Course, Exam, Lecture, Section, SlideDeck } from '../types/lecture';
 import type { StudySession, StudySettings } from '../types/plan';
 import type { Question, QuizAttempt } from '../types/quiz';
+import type { PageReading } from '../types/reading';
 import type { ClassMaterial, ExamStyle } from '../types/style';
 
 export const DB_NAME = 'honed';
-export const DB_VERSION = 9;
+export const DB_VERSION = 10;
 
 /**
  * One row of the change log: every write, in order, with the device that made it. v2's sync ships
@@ -43,7 +44,8 @@ export interface ChangeRecord {
     | 'settings'
     | 'annotation'
     | 'material'
-    | 'examStyle';
+    | 'examStyle'
+    | 'pageReading';
   entityId: string;
   op: 'put' | 'delete';
   data:
@@ -59,6 +61,7 @@ export interface ChangeRecord {
     | Annotation
     | ClassMaterial
     | StoredExamStyle
+    | PageReading
     | null; // never file bytes
 }
 
@@ -189,6 +192,15 @@ export interface SealedExamStyle {
   enc: EncryptedRecord;
 }
 
+// --- Page readings (#168): what the AI read on a deck's pictures. Readable fields as in docs/SECURITY.md ---
+
+export interface SealedPageReading {
+  id: string;
+  courseId: string;
+  deckId: string;
+  enc: EncryptedRecord; // the page and the reading are inside
+}
+
 export interface HonedSchema extends DBSchema {
   // deviceId (string), keyring (Keyring), keycheck (EncryptedRecord), migration ('running'),
   // remembered (RememberedKey, #99), sync (SyncState, #105)
@@ -214,6 +226,7 @@ export interface HonedSchema extends DBSchema {
   materialFiles: { key: string; value: MaterialFile | SealedDeckFile };
   materialPages: { key: string; value: MaterialPages | SealedDeckPages };
   examStyles: { key: string; value: StoredExamStyle | SealedExamStyle };
+  pageReadings: { key: string; value: PageReading | SealedPageReading; indexes: { byCourse: string; byDeck: string } };
 }
 
 export type HonedDb = IDBPDatabase<HonedSchema>;
@@ -234,7 +247,8 @@ export type RecordStore =
   | 'materials'
   | 'materialFiles'
   | 'materialPages'
-  | 'examStyles';
+  | 'examStyles'
+  | 'pageReadings';
 /** Every store of records (everything but meta): what setUp seals and backups (#18) copy. */
 export const RECORD_STORES: RecordStore[] = [
   'changes',
@@ -254,6 +268,7 @@ export const RECORD_STORES: RecordStore[] = [
   'materialFiles',
   'materialPages',
   'examStyles',
+  'pageReadings',
 ];
 
 /** Milestone 2's flashcard stores and change-log entities, dropped by step 4. */
@@ -344,6 +359,12 @@ export async function openHonedDb(name: string = DB_NAME): Promise<HonedDb> {
         db.createObjectStore('materialFiles', { keyPath: 'id' });
         db.createObjectStore('materialPages', { keyPath: 'id' });
         db.createObjectStore('examStyles', { keyPath: 'id' });
+      }
+      // Step 10 (Nov 26, 2026, #168): what the AI read on a deck's pictures, one record per page
+      if (oldVersion < 10) {
+        const readings = db.createObjectStore('pageReadings', { keyPath: 'id' });
+        readings.createIndex('byCourse', 'courseId');
+        readings.createIndex('byDeck', 'deckId');
       }
     },
   });

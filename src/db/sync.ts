@@ -33,6 +33,7 @@ export const ENTITY_STORE: Record<ChangeRecord['entity'], RecordStore> = {
   annotation: 'annotations',
   material: 'materials',
   examStyle: 'examStyles',
+  pageReading: 'pageReadings',
 };
 const ENTITIES = new Set(Object.keys(ENTITY_STORE));
 

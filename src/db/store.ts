@@ -20,10 +20,12 @@ import { decryptBytes, decryptRecord, encryptBytes, encryptRecord, recallKey, re
 import type { EncryptedRecord, Keyring, KeyringEntry, RememberedKey, UnlockMethod } from '../types/crypto';
 import type { LectureStore, Section } from '../types/lecture';
 import type { AnnotationStore } from '../types/annotation';
+import type { ReadingStore } from '../types/reading';
 import type { PlanStore } from '../types/plan';
 import type { QuizStore } from '../types/quiz';
 import type { ExamStyleStore } from '../types/style';
 import { annotationMethods } from './annotations';
+import { readingMethods } from './readings';
 import { lectureMethods, type FileSource } from './lectures';
 import { planMethods } from './plan';
 import { quizMethods } from './quiz';
@@ -33,7 +35,7 @@ import { DB_VERSION, openHonedDb, RECORD_STORES, type ChangeRecord, type HonedDb
 
 export type StoreStatus = 'new' | 'locked' | 'unlocked';
 
-export interface StudyStore extends LectureStore, QuizStore, PlanStore, AnnotationStore, ExamStyleStore {
+export interface StudyStore extends LectureStore, QuizStore, PlanStore, AnnotationStore, ExamStyleStore, ReadingStore {
   deviceId(): string;
 
   // --- The lock side (the screens' `Vault`, src/ui/vault.ts) ---
@@ -159,6 +161,7 @@ const READABLE: Record<RecordStore, readonly string[]> = {
   materialFiles: ['id'], // raw bytes, like deckFiles
   materialPages: ['id'],
   examStyles: ['id'], // examStyleId(the class)
+  pageReadings: ['id', 'courseId', 'deckId'], // pageReadingId(deck, page): the page is inside
 };
 const KEYCHECK_AAD = 'honed:v1:meta:keycheck';
 
@@ -353,6 +356,8 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
     ...planMethods({ db, clock: deps.clock, newId: deps.newId, seal, open, openAll, change, exclusive, requireOpen }),
     // Notes and highlights on slides (#56): src/db/annotations.ts
     ...annotationMethods({ db, clock: deps.clock, newId: deps.newId, seal, open, openAll, change, exclusive, requireOpen }),
+    // What the AI read on a deck's pictures (#168): src/db/readings.ts
+    ...readingMethods({ db, clock: deps.clock, newId: deps.newId, seal, open, openAll, change, exclusive, requireOpen }),
     // Class materials and exam styles (#120): src/db/style.ts
     ...styleMethods({
       db,
