@@ -73,6 +73,7 @@ slides" and "M6: AI helper and quizzes":
 | Animate the site, step 2: page transitions | #149 | Matt's Claude | new `src/ui/page-motion.ts` (+ test), the screen's wrapper and `usePageMotion` in `src/App.tsx`, the page transition styles in `src/app.css`, reduced motion by default in `playwright.config.ts`, `tests/browsers/motion.spec.ts`, the motion part of `docs/design/README.md` | **Done** (PR #150) |
 | Animate the site, step 3: ticking off a task | #153 | Matt's Claude | new `src/ui/tick-memory.ts` (+ test), `fresh` on `Tick` in `src/ui/TasksScreen.tsx`, the tick styles in `src/app.css`, the tick tests in `tests/browsers/motion.spec.ts`, the Tasks part of `docs/design/README.md` | **Done** (PR #154) |
 | Question prompts: wrong options as long as the right one; skip summary slides | #158 | Matt's Claude | the `questions` and `written` prompts in `helper/jobs.mjs` (`SKIP_SLIDES`), `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (PR #159). **The helper changed: press Update for `honed-ai`** |
+| Question prompts: level 3 needs working out; plain, exact wording | #164 | Matt's Claude | `LEVELS` and `STANDALONE` in `helper/jobs.mjs`, `tests/helper/helper.test.mjs`, the levels in `docs/DESIGN.md` | **Done** (PR #165). **The helper changed: press Update for `honed-ai`** |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 | Design: read pictures at upload, and choose models by difficulty (reading and quizzes) | #151 | Nathan's Claude | `docs/DESIGN.md` ("Reading pictures and choosing models", a line of "Decisions so far") | **Done** (PR #152, Matt's OK). Built in its own issues, in the design's build order |
 | Reading pictures, step 1: model test (Haiku vs Sonnet vs Opus on real pages) | #155 | Nathan's Claude | new `tools/read-pages/` (the tool and the reading prompt), `tests/read-pages.test.mjs`, "Model test results" in `docs/DESIGN.md` | **Done** (this PR): a handout, a chemistry textbook and a statistics textbook |
@@ -162,6 +163,15 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 27 (#164):** The other two prompt fixes from Matt's lambda calculus lecture (after #158). (1) Levels: about a
+  quarter of the level 3 questions were answered by a sentence on a slide ("What happened to Church's original
+  system?"). `LEVELS` now says a level is what answering takes: what a student who memorised the slides could answer
+  without working anything out is level 1, however it's phrased, and level 3 needs several steps or reasoning the
+  slides don't spell out. Rerun: **level 3 recall questions went from 7 of 28 to 0**; recall moved to level 1, though a
+  few simple two-step reductions are now labelled 3. (2) Wording: a shared `STANDALONE` rule asks for plain, exact words
+  that say which part of a formula is meant, and for each question to be read back and rewritten if awkward. Rerun:
+  occurrences are named exactly ("the y inside the abstraction and the final x outside it"), and nothing awkward
+  turned up. 4 deliberate breaks, all caught. **The helper changed: press Update for `honed-ai`.**
 - **Nov 26 (#168, 5c):** The app's side of background reading: `WorkRunner` (every 3 min while unlocked, with an
   account) makes the results key, files finished results as page readings and confirms them, resends jobs the helper
   forgot, and sends the next section the planner wants within 14 days whose picture pages aren't read (only those pages,

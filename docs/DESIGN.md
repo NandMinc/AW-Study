@@ -234,9 +234,14 @@ The AI gives each question a level when it writes it, following the guide's desc
 
 | Level | What it asks | Form | Time counted |
 | --- | --- | --- | --- |
-| 1 Recognise | Recall or recognise: a term, a fact, which rule or method applies, what a result means | Multiple choice | 20 s |
+| 1 Recognise | Recall or recognise: a term, a fact, a definition, a name or date, which rule or method applies, what a result means | Multiple choice | 20 s |
 | 2 Apply | One or two steps of reasoning, a short calculation, applying an idea to a stated case | Multiple choice | 45 s |
-| 3 Exam-style | What the exam would ask: a full worked problem, or "explain why", "compare", "what happens if" | Multiple choice (worked problems, wrong options = common mistakes) or a **short answer** | 2 min |
+| 3 Exam-style | What the exam would ask: a full worked problem, or "explain why", "compare", "what happens if" about a case to work through | Multiple choice (worked problems, wrong options = common mistakes) or a **short answer** | 2 min |
+
+A level is what answering takes, not how the question sounds (#164): anything a student who memorised the slides
+could answer without working anything out is level 1, even a "why" or "what follows". Level 3 needs several steps,
+or reasoning the slides don't spell out. Both question jobs also ask for plain, exact wording that says which part
+of a formula is meant, and for each question to be read back and rewritten if it's awkward.
 
 Three levels because the AI can tell them apart reliably; a finer scale would be noise. Questions made before
 this count as level 2, multiple choice.
