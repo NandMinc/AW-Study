@@ -20,7 +20,7 @@ import { accessChecker } from './access.mjs';
 import { createHelper, peopleFromEnv } from './app.mjs';
 import { runClaude } from './claude.mjs';
 import { createQueue } from './queue.mjs';
-import { readingRound } from './rounds.mjs';
+import { questionRounds, readingRound } from './rounds.mjs';
 
 const env = process.env;
 const people = peopleFromEnv(env);
@@ -33,7 +33,7 @@ const queue =
   (env.HELPER_BACKGROUND ?? 'on') === 'off'
     ? null
     : createQueue({
-        rounds: [readingRound({ people, run: runClaude, timeoutMs, log })],
+        rounds: [readingRound({ people, run: runClaude, timeoutMs, log }), ...questionRounds({ people, run: runClaude, timeoutMs, log })],
         delayMs: Number(env.HELPER_BATCH_DELAY_MS ?? 1_800_000),
         marginMs: Number(env.HELPER_BATCH_MARGIN_MS ?? 7_200_000),
         dailyPages: Number(env.HELPER_DAILY_PAGES ?? 300),

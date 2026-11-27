@@ -523,6 +523,9 @@ model when possible").
   helper's checks today (four options, one right answer, a slide number, nothing pointing at unseen material).
 - **Marking short answers, Explain this and Ask about this use Sonnet:** fairness matters, someone is waiting for the
   answer, and there are few of them.
+- **Built (#172, 6a):** `questionRounds` in `helper/rounds.mjs`. The blind check covers Haiku's multiple choice; if
+  the check itself can't be done (two unusable answers), all of that part is rewritten rather than kept unchecked.
+  Rewrites are as many again, on the failed questions' group, at their levels, avoiding the failed ones.
 - **The helper chooses the model, never the student.** Settings' Compare models (#79) stays for us to test with.
 
 **Cost per student per month** (estimates, about ±50%; Nov 26 API prices per million tokens in/out: Haiku 5.5 $0.10/$0.50,
