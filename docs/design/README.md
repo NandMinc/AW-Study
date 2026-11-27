@@ -64,6 +64,10 @@ editing a class) hide it and have a back button instead (our call).
 
 Opens by default. Its job: see and finish today's review and quizzes.
 
+When you come back after finishing a quiz, each new tick draws itself in with a small pop (#153, Matt, Nov 26):
+the lecture's, its class's once all of it is done, and exam practice's. Ticks you've already seen stay still, and
+so does everything on the first look after opening the app. Nothing moves with reduced motion.
+
 - **Progress bar** at the top fills as today's work gets done. No times are shown anywhere any more,
   but the estimates from setting up a class are still used to weigh each class's share of the bar,
   with a quiz counting as about 10 questions' worth of time. While you're in a class's slides, the

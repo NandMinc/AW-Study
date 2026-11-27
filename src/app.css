@@ -1122,6 +1122,38 @@ button.link {
   stroke-linejoin: round;
 }
 
+/* A tick done since Tasks was last shown draws itself in, with a small pop (#153, tick-memory.ts) */
+.tick-new {
+  animation: tick-pop 0.45s ease-out backwards;
+}
+
+.tick-new path {
+  stroke-dasharray: 1; /* the path's length, from pathLength="1" */
+  animation: tick-draw 0.35s 0.1s ease-out backwards;
+}
+
+@keyframes tick-pop {
+  from {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+}
+
+@keyframes tick-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tick-new,
+  .tick-new path {
+    animation: none;
+  }
+}
+
 .task-lecture {
   display: flex;
   align-items: center;
