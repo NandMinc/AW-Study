@@ -424,7 +424,12 @@ holds.**
 - **The keyring rule becomes:** at least one way to unlock (passphrase, passkey, or Google unlock) and
   always a recovery key, so losing the Google account never means losing the data.
 
-### AI work in the background: the results key (#161, designed Nov 26, not built)
+### AI work in the background: the results key (#161, designed Nov 26)
+
+**Built so far:** the crypto (`src/lib/results-key.ts`: `newResultsKey`, `openResultsKey`, `sealResult`, `openResult`,
+`keyedFingerprint`) and the sync server keeping the key (`GET`/`PUT /api/results-key`, schema step 5: saved once, a
+different key refused with 422, the public key checked to be a real P-256 point). Devices make and use it from the
+queue (build step 4).
 
 The batch flow ("Reading pictures and choosing models" in `docs/DESIGN.md`, #151) does AI work while no device is
 open: reading a section's pictures and writing its questions. A device sends the covered pages when the student

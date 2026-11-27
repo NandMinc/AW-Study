@@ -8,9 +8,11 @@ import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createSync, deviceName, MAX_FILE_BYTES, RECENT_SIGN_IN_MS, safePath, SESSION_COOKIE, SESSION_IDLE_MS, SESSION_MAX_MS, SIGN_IN_WAIT_MS, SIGNIN_COOKIE } from '../../sync/app.mjs';
+import { createSync, deviceName, MAX_FILE_BYTES, MAX_RESULTS_KEY_CT, RECENT_SIGN_IN_MS, safePath, SESSION_COOKIE, SESSION_IDLE_MS, SESSION_MAX_MS, SIGN_IN_WAIT_MS, SIGNIN_COOKIE } from '../../sync/app.mjs';
 import { openDb, SCHEMA_STEP } from '../../sync/db.mjs';
 import { googleClient, SignInError } from '../../sync/google.mjs';
+import { newDataKey } from '../../src/lib/crypto';
+import { newResultsKey, openResult, openResultsKey, sealResult } from '../../src/lib/results-key';
 
 const ORIGIN = 'http://honed.test';
 const CLIENT_ID = 'client-123.apps.googleusercontent.com';
@@ -644,6 +646,73 @@ describe('sync: the keyring (#105)', () => {
     // Bigger than the 16 KB body limit: refused
     expect((await b.send('PUT', '/api/keyring', { version: 0, keyring: huge, keycheck: KEYCHECK })).status).toBe(400);
     expect((await b.go('/api/keyring')).status).toBe(404);
+  });
+});
+
+describe('the results key (#161)', () => {
+  const b64 = (bytes) => Buffer.from(bytes).toString('base64url');
+  const fromB64 = (text) => new Uint8Array(Buffer.from(text, 'base64url'));
+  /** A real results key from the app's own code, as a device would upload it. */
+  async function realKey(dataKey) {
+    const { upload } = await newResultsKey(dataKey ?? (await newDataKey()));
+    return { publicKey: b64(upload.publicKey), sealed: { v: 1, iv: b64(upload.sealed.iv), ct: b64(upload.sealed.ct) } };
+  }
+
+  it('is saved once: the same key again is fine, another key is refused, other accounts see none of it', async () => {
+    const pc = browser();
+    await signIn(pc, NATHAN);
+    expect((await pc.go('/api/results-key')).status).toBe(404);
+    const key = await realKey();
+    expect(await (await pc.send('PUT', '/api/results-key', key)).json()).toEqual({ saved: true });
+    expect(await (await pc.go('/api/results-key')).json()).toEqual(key);
+    // A second device that made its own at the same moment loses: told so, and the first stays
+    expect((await pc.send('PUT', '/api/results-key', key)).status).toBe(200);
+    const late = await pc.send('PUT', '/api/results-key', await realKey());
+    expect(late.status).toBe(422);
+    expect(await late.json()).toMatchObject({ differentKey: true });
+    // Nor can the sealed part be swapped under the same public key
+    expect((await pc.send('PUT', '/api/results-key', { ...key, sealed: { ...key.sealed, ct: key.sealed.ct.slice(1) } })).status).toBe(422);
+    expect(await (await pc.go('/api/results-key')).json()).toEqual(key);
+
+    const matt = browser();
+    await signIn(matt, MATT);
+    expect((await matt.go('/api/results-key')).status).toBe(404);
+    const mattKey = await realKey();
+    expect((await matt.send('PUT', '/api/results-key', mattKey)).status).toBe(200);
+    expect(await (await pc.go('/api/results-key')).json()).toEqual(key);
+  });
+
+  it('opens on another device of the account, and a result sealed to it opens there', async () => {
+    const dataKey = await newDataKey();
+    const pc = browser();
+    await signIn(pc, NATHAN);
+    await pc.send('PUT', '/api/results-key', await realKey(dataKey));
+    const phone = browser(IPHONE);
+    await signIn(phone, NATHAN);
+    const got = await (await phone.go('/api/results-key')).json();
+    const key = await openResultsKey(dataKey, fromB64(got.publicKey), { v: 1, iv: fromB64(got.sealed.iv), ct: fromB64(got.sealed.ct) });
+    const sealed = await sealResult(fromB64(got.publicKey), 'acc', 'r1', new TextEncoder().encode('read'));
+    expect(new TextDecoder().decode(await openResult(key, 'acc', 'r1', sealed))).toBe('read');
+  });
+
+  it('refuses anything that isn’t a results key', async () => {
+    const b = browser();
+    await signIn(b, NATHAN);
+    const key = await realKey();
+    const notOnTheCurve = b64(Uint8Array.of(4, ...new Uint8Array(64).fill(7)));
+    for (const bad of [
+      { ...key, publicKey: key.publicKey.slice(0, 40) },
+      { ...key, publicKey: notOnTheCurve },
+      { ...key, publicKey: b64(Uint8Array.of(2, ...fromB64(key.publicKey).slice(1))) },
+      { ...key, sealed: undefined },
+      { ...key, sealed: { ...key.sealed, v: 2 } },
+      { ...key, sealed: { ...key.sealed, iv: 'short' } },
+      { ...key, sealed: { ...key.sealed, ct: 'A'.repeat(MAX_RESULTS_KEY_CT + 1) } },
+      { ...key, sealed: { ...key.sealed, ct: 'not base64url!' } },
+    ]) {
+      expect((await b.send('PUT', '/api/results-key', bad)).status).toBe(400);
+    }
+    expect((await b.go('/api/results-key')).status).toBe(404);
   });
 });
 
