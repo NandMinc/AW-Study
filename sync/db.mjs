@@ -2,7 +2,7 @@
 // node:sqlite. Numbered schema steps (PRAGMA user_version): never edit a step that has shipped, add one.
 //
 // Step 1: accounts and sessions. Step 2: Google unlock keys and when they were used. Step 3: sync
-// (the keyring and the sealed changes). Step 4: which slide files are kept (the bytes are files beside it). What's readable here is exactly docs/SECURITY.md's "What the sync
+// (the keyring and the sealed changes). Step 4: which slide files are kept (the bytes are files beside it). Step 5: results keys (#161). What's readable here is exactly docs/SECURITY.md's "What the sync
 // server holds": the Google account id and email, and sessions as SHA-256 hashes, never the tokens.
 import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
@@ -75,6 +75,15 @@ const STEPS = [
      size        INTEGER NOT NULL,
      uploaded_at TEXT NOT NULL,
      PRIMARY KEY (account_id, deck_id, kind)
+   );`,
+  // Step 5 (Nov 26, 2026, #161): the account's results key for AI work in the background (docs/SECURITY.md "AI
+  // work in the background"). The public key (anyone may know it) and the private part sealed with the data key,
+  // stored once and never replaced.
+  `CREATE TABLE results_keys (
+     account_id  TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+     public_key  TEXT NOT NULL,                 -- raw P-256 point, base64url
+     sealed      TEXT NOT NULL,                 -- JSON { v, iv, ct }, base64url, as the device sent it
+     created_at  TEXT NOT NULL
    );`,
 ];
 

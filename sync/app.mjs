@@ -14,6 +14,8 @@
 //   GET    /api/unlock-uses                         when and on which device the key was given out
 //   GET    /api/keyring                             sync (#105): the account's keyring and key check, or 404
 //   PUT    /api/keyring  { version, keyring, keycheck }  compare and swap; the key check never changes
+//   GET    /api/results-key                         the account's results key (#161): { publicKey, sealed }, or 404
+//   PUT    /api/results-key  { publicKey, sealed }  saved once; the same key again is fine, another one is refused (422)
 //   POST   /api/changes  { changes: [...] }          sealed changes, added (the same id twice is kept once)
 //   GET    /api/changes?after=N[&limit=M]           the changes after number N, oldest first
 //   PUT    /api/files/<deckId>/<pdf|pages>         a deck's file, sealed, as raw bytes (#108)
@@ -22,7 +24,7 @@
 //
 // Requests that change something must come from our own site (Origin) as JSON. Answers are never
 // cached. Logs are routes, statuses and times: never emails, tokens or codes.
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, webcrypto } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, rename, rm, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -54,6 +56,19 @@ const B64URL = /^[\w-]*$/;
 const TOUCH_EVERY_MS = 3_600_000; // a session's "last used" is saved at most hourly
 
 const hashToken = (token) => createHash('sha256').update(token).digest('base64url');
+
+/** A results key's sealed private part, base64url: a P-256 private key and a fingerprint key, sealed (~260 characters). */
+export const MAX_RESULTS_KEY_CT = 1024;
+
+/** Whether a base64url string is a real P-256 public point (so nobody stores something results can't be sealed to). */
+async function isP256Point(b64) {
+  try {
+    await webcrypto.subtle.importKey('raw', Buffer.from(b64, 'base64url'), { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * @param {object} options
@@ -88,6 +103,8 @@ export function createSync({ db, google, allowedEmails, appOrigin, filesDir, log
     deleteUnlockKey: db.prepare('DELETE FROM unlock_keys WHERE account_id = ?'),
     addUnlockUse: db.prepare('INSERT INTO unlock_uses (account_id, device, at) VALUES (?, ?, ?)'),
     unlockUses: db.prepare('SELECT device, at FROM unlock_uses WHERE account_id = ? ORDER BY at DESC LIMIT 20'),
+    resultsKey: db.prepare('SELECT public_key, sealed FROM results_keys WHERE account_id = ?'),
+    addResultsKey: db.prepare('INSERT OR IGNORE INTO results_keys (account_id, public_key, sealed, created_at) VALUES (?, ?, ?, ?)'),
     keyring: db.prepare('SELECT keyring, keycheck, version FROM keyrings WHERE account_id = ?'),
     addKeyring: db.prepare('INSERT INTO keyrings (account_id, keyring, keycheck, version, updated_at) VALUES (?, ?, ?, 1, ?)'),
     swapKeyring: db.prepare('UPDATE keyrings SET keyring = ?, version = version + 1, updated_at = ? WHERE account_id = ? AND version = ?'),
@@ -370,6 +387,33 @@ export function createSync({ db, google, allowedEmails, appOrigin, filesDir, log
         return json(409, { error: 'The keyring changed on another device first.', version: q.keyring.get(s.account_id).version });
       }
       return json(200, { version: version + 1 });
+    }
+
+    // --- The results key (#161, docs/SECURITY.md "AI work in the background") ---
+
+    if (url.pathname === '/api/results-key' && req.method === 'GET') {
+      const row = q.resultsKey.get(s.account_id);
+      if (!row) return json(404, { none: true });
+      return json(200, { publicKey: row.public_key, sealed: JSON.parse(row.sealed) });
+    }
+
+    if (url.pathname === '/api/results-key' && req.method === 'PUT') {
+      const { publicKey, sealed } = body;
+      const ok =
+        typeof publicKey === 'string' && publicKey.length === 87 && B64URL.test(publicKey) &&
+        Buffer.from(publicKey, 'base64url')[0] === 4 &&
+        sealed?.v === 1 &&
+        typeof sealed.iv === 'string' && sealed.iv.length === 16 && B64URL.test(sealed.iv) &&
+        typeof sealed.ct === 'string' && sealed.ct.length > 0 && sealed.ct.length <= MAX_RESULTS_KEY_CT && B64URL.test(sealed.ct);
+      if (!ok || !(await isP256Point(publicKey))) return json(400, { error: 'Bad results key.' });
+      const sealedText = JSON.stringify({ v: 1, iv: sealed.iv, ct: sealed.ct });
+      // Made once, never replaced: the first upload wins, and only that same key is accepted after
+      q.addResultsKey.run(s.account_id, publicKey, sealedText, now().toISOString());
+      const row = q.resultsKey.get(s.account_id);
+      if (row.public_key !== publicKey || row.sealed !== sealedText) {
+        return json(422, { error: 'This account already has another results key.', differentKey: true });
+      }
+      return json(200, { saved: true });
     }
 
     if (url.pathname === '/api/changes' && req.method === 'POST') {

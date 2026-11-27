@@ -83,6 +83,31 @@ export type UnlockSecret =
   | { method: 'passkey'; credentialId: Uint8Array; prfOutput: Uint8Array }
   | { method: 'google'; googleKey: Uint8Array }; // the account's Google unlock key, from the sync server
 
+/**
+ * An account's results key, open on a device (#161, docs/SECURITY.md "AI work in the background"): the
+ * public key (raw P-256, 65 bytes) the server seals results to, the private key that opens them and the key
+ * that turns page fingerprints into keyed ones. Both keys are non-extractable.
+ */
+export interface ResultsKey {
+  publicKey: Uint8Array;
+  privateKey: CryptoKey;
+  fingerprintKey: CryptoKey;
+}
+
+/** A new results key as it goes to the server: the public key, and the private part sealed with the data key. */
+export interface NewResultsKey {
+  publicKey: Uint8Array;
+  sealed: EncryptedRecord;
+}
+
+/** A result sealed to an account's results key: an ephemeral public key (raw P-256), a 12-byte IV, AES-GCM. */
+export interface SealedResult {
+  v: 1;
+  epk: Uint8Array;
+  iv: Uint8Array;
+  ct: Uint8Array;
+}
+
 export type CryptoErrorCode =
   | 'wrong-secret' // doesn't unlock this keyring
   | 'invalid' // badly formed input (e.g. a recovery key failing its check)
