@@ -540,7 +540,16 @@ own text the rest. Prices include Claude Code writing each request to a one-hour
 with batches will be cheaper. **Reading, a month, for the example student:** if 3 in 10 picture pages are hard, about $9
 ($4.50 batched); a student whose courses are mostly chemistry-like, about $20-28 ($10-14 batched). Hard pages are read by
 Haiku first and then Sonnet: a quick Haiku "kinds only" pass would save about 0.15¢ per hard page, too little for now.
-**Still to test:** a deck with graphs (plotted data).
+
+**Graphs** (6 pages of an open statistics textbook, Nov 26: three tables drawn with lines, three pages of bar charts and
+histograms). A simple bar chart was read exactly by all three models, Haiku included. Comparing two histograms' shapes,
+Haiku got the point (heavy against light tails) but was loose on detail ("slightly lower" for bars at about 60% of the
+peak); Sonnet gave every bar's height, matching the page; Opus was close. So graphs stay a hard kind: quiz questions ask
+about values. Per page: Haiku ~0.1¢, Sonnet ~1.5¢, Opus ~3¢.
+**These graphs aren't pictures:** they're drawn with lines (vector paths), with no image in the PDF at all, and so are
+the tables. So sorting pages on the device (build step 2) must look at what's drawn, not only at images: count drawing
+and measure the area it covers outside the text. Tables drawn with lines whose words are real text need nothing read
+(Sonnet answered "nothing to add" for one); if the sorting sends them anyway, Haiku handles them for 0.1¢.
 
 **What changes**
 

@@ -74,7 +74,7 @@ slides" and "M6: AI helper and quizzes":
 | Animate the site, step 3: ticking off a task | #153 | Matt's Claude | new `src/ui/tick-memory.ts` (+ test), `fresh` on `Tick` in `src/ui/TasksScreen.tsx`, the tick styles in `src/app.css`, the tick tests in `tests/browsers/motion.spec.ts`, the Tasks part of `docs/design/README.md` | **Done** (PR #154) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 | Design: read pictures at upload, and choose models by difficulty (reading and quizzes) | #151 | Nathan's Claude | `docs/DESIGN.md` ("Reading pictures and choosing models", a line of "Decisions so far") | **Done** (PR #152, Matt's OK). Built in its own issues, in the design's build order |
-| Reading pictures, step 1: model test (Haiku vs Sonnet vs Opus on real pages) | #155 | Nathan's Claude | new `tools/read-pages/` (the tool and the reading prompt), `tests/read-pages.test.mjs`, "Model test results" in `docs/DESIGN.md` | Handout and chemistry **done** (this PR); a deck with graphs still to test |
+| Reading pictures, step 1: model test (Haiku vs Sonnet vs Opus on real pages) | #155 | Nathan's Claude | new `tools/read-pages/` (the tool and the reading prompt), `tests/read-pages.test.mjs`, "Model test results" in `docs/DESIGN.md` | **Done** (this PR): a handout, a chemistry textbook and a statistics textbook |
 
 ## Milestones
 
@@ -162,7 +162,8 @@ the "Test and publish" run on `main` to finish, then press Update.
   `tests/read-pages.test.mjs`; 4 deliberate breaks, all caught). Findings (DESIGN.md "Model test results"): `claude -p`
   takes images with every tool off; Haiku is enough for pictures of text, Sonnet is needed for chemistry and matches
   Opus; route by the page's kinds of content, since "unsure" meant "chemistry"; reading costs about 3× the first estimate
-  (a page image is ~1,950 tokens). A deck with graphs is still to test.
+  (a page image is ~1,950 tokens). Graphs (a statistics textbook): Haiku reads simple charts right but is loose on detail,
+  so graphs stay with Sonnet; they and line-drawn tables are vector drawings, not images, which step 2 must handle.
 - **Nov 26 (#151, design, Matt's OK):** Reading pictures. Two real files showed the AI misses what isn't text: a
   handout whose definitions are pictures of text, and an organic chemistry textbook whose structures and arrows are
   drawings. Design: pages sorted on the device, picture pages read once by Claude when added (Haiku first, Sonnet for about
