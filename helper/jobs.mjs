@@ -176,6 +176,8 @@ const STANDALONE = [
   'The student sees only the question and its options, never the slides, so every question must stand on its own: an expert on the subject who has never seen these slides must be able to answer it perfectly.',
   'So never refer to the slides, the lecture, the course or the teacher, and never to a diagram, figure, image, chart or example that isn\'t written out in the question ("in this diagram", "as shown", "according to the slide" are all wrong). You only have each slide\'s text, not its pictures, so don\'t ask about what a picture might show. Put any numbers, definitions or set-up a question needs into the question itself.',
   'Ask about the subject, not about how these slides happen to word or arrange it.',
+  // #164: "the two occurrences of x after the dot and outside the λ"
+  String.raw`Write every question in plain, exact words a student understands on the first reading: one question at a time, no double negatives, and when it points at part of a formula, say exactly which part (for example "the x inside \(\lambda x.x\)", not "the occurrence after the dot"). Read each question back as the student would before replying, and rewrite any that is awkward or could be read two ways.`,
   'Where the material can be worked through (calculations, equations, derivations, code, problems with a method), include worked problems that apply the method to concrete values written in the question, such as "Solve ..." or "Calculate ...". Use them where they test understanding better than recall would; not every question needs to be one.',
 ].join('\n');
 
@@ -212,9 +214,11 @@ const SKIP_SLIDES =
 // DESIGN "Levels": three, because the AI can tell them apart reliably
 const LEVELS = [
   'Give every question a level, by what it asks the student to do:',
-  '1 (recognise): recall or recognise a term, a fact, which rule or method applies, or what a result means.',
+  '1 (recognise): recall or recognise a term, a fact, a definition, a name or date, which rule or method applies, or what a result means.',
   '2 (apply): one or two steps of reasoning, a short calculation, or applying an idea to a case the question states.',
-  '3 (exam-style): what the exam itself would ask: a full worked problem, or "explain why", "compare", "what happens if".',
+  '3 (exam-style): what the exam itself would ask: a full worked problem, or "explain why", "compare", "what happens if", about a case the student has to work through.',
+  // #164: on one lecture, about a third of the level 3 questions were answered by a sentence on a slide
+  'A level is what answering takes, not how the question sounds: if a student who memorised the slides could answer it without working anything out, it is level 1, however it is phrased ("why", "what follows", "the significance of") and however important the idea. Level 3 needs several steps, or reasoning the slides don\'t spell out.',
 ].join('\n');
 
 const GUIDE =
