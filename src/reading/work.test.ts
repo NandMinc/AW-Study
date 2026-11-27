@@ -32,17 +32,36 @@ function servers() {
   const calls: { method: string; url: string; body: Record<string, unknown> | null }[] = [];
   let resultsKey: unknown = null;
   let aiSignedIn = true;
+  type Plan = { questions: { requests: { pages: number[]; count: number; mix: { choice: number[]; short: number } }[] } } | null;
   const read = {
     name: 'read',
-    run: async ({ pages }: { pages: { page: number; fp: string; image: Uint8Array | null }[] }) => ({
-      carry: {
+    run: async ({ pages, plan }: { pages: { page: number; fp: string; image: Uint8Array | null }[]; plan: Plan }) => ({
+      [plan ? 'carry' : 'output']: {
         readings: pages
           .filter((p) => p.image)
           .map((p) => ({ page: p.page, fp: p.fp, model: 'claude-sonnet-5-5', reading: { pictureText: '', figures: [{ label: 'Graph', description: 'A zig-zag line.' }], kinds: ['graph'], decorativeOnly: false } })),
       },
+      ...(plan ? {} : { done: true }),
     }),
   };
-  const makeQueue = () => createQueue({ rounds: [read], delayMs: HOUR, marginMs: 2 * HOUR, dailyPages: 100, now: () => clock });
+  // Writes what the plan asks for: per group, its count at the levels its mix says, on its first page
+  let n = 0;
+  const write = {
+    name: 'questions',
+    run: async ({ carry, plan }: { carry: { readings: unknown[] }; plan: Plan }) => ({
+      done: true,
+      output: {
+        readings: carry.readings,
+        questions: plan!.questions.requests.flatMap((r) => [
+          ...[1, 2, 3].flatMap((level) =>
+            Array.from({ length: r.mix.choice[level - 1]! }, () => ({ form: 'choice', level, question: `Which value is shown ${++n}?`, options: ['a', 'b', 'c', 'd'], answer: 1, page: r.pages[0], explanation: 'b.' })),
+          ),
+          ...Array.from({ length: r.mix.short }, () => ({ form: 'short', level: 3, question: `Explain trend ${++n}.`, points: ['it rises'], page: r.pages[0], explanation: 'It rises.' })),
+        ]),
+      },
+    }),
+  };
+  const makeQueue = () => createQueue({ rounds: [read, write], delayMs: HOUR, marginMs: 2 * HOUR, dailyPages: 100, now: () => clock });
   const s = {
     calls,
     queue: makeQueue(),
@@ -95,15 +114,21 @@ function servers() {
 }
 
 /** An encrypted store with an account, a class and a 5-page deck whose page 2 has a graph, covered by a lecture today. */
-async function setUp(dataKey?: CryptoKey) {
+async function setUp(dataKey?: CryptoKey, pictureOnly = false) {
   store = await openStudyStore({ name: `work-${++counter}`, deps: { clock: () => clock } });
   const key = dataKey ?? (await newDataKey());
   await store.setUp(await testKeyring(key), key);
   await store.setSyncState({ email: 'nathan@example.com', pulled: 0, pushedSeq: 0, keyringVersion: 1, keyringSent: '', seenAt: 0 } as SyncState);
   const course = await store.createCourse({ name: 'STAT 255', meetings: [], termStart: null, termEnd: null });
-  const pages = [1, 2, 3, 4, 5].map((n) => ({ title: `Page ${n}`, body: `Words on page ${n}.`, ...(n === 2 ? { drawing: graphDrawing(100, 300, 300, 200) } : {}) }));
+  // Page 2 has a graph; with `pictureOnly` it has nothing else (no text at all, like a scanned page)
+  const pages = [1, 2, 3, 4, 5].map((n) =>
+    n === 2 && pictureOnly
+      ? { title: '', noBar: true, drawing: graphDrawing(100, 300, 300, 200) }
+      : { title: `Page ${n}`, body: `Words on page ${n}.`, ...(n === 2 ? { drawing: graphDrawing(100, 300, 300, 200) } : {}) },
+  );
   const pdf = makePdf(pages, LETTER);
-  const deck = await store.addSlideDeck({ courseId: course.id, title: 'Distributions', fileName: 'dist.pdf', data: pdf, pageTexts: pages.map((p) => `${p.title}\n${p.body}`) });
+  const pageTexts = pages.map((p) => [p.title, 'body' in p ? p.body : ''].filter(Boolean).join('\n'));
+  const deck = await store.addSlideDeck({ courseId: course.id, title: 'Distributions', fileName: 'dist.pdf', data: pdf, pageTexts });
   const lecture = await store.recordLecture({ courseId: course.id, date: '2026-11-26', minutes: 50, sections: [{ deckId: deck.id, firstPage: 1, lastPage: 4 }] });
   return { key, deck, section: lecture.sections[0]! };
 }
@@ -126,16 +151,31 @@ describe('background work, end to end', () => {
     expect(s.calls).toEqual([]);
   });
 
-  it('sends only the unread picture pages of an upcoming section, then files what comes back', async () => {
+  it('sends an upcoming section: pictures only of unread pages, text and a plan for its bank; files what comes back', async () => {
     const { deck, section } = await setUp();
     const s = servers();
     const first = await workOnce(store, { fetcher: s.fetcher, now: () => clock, timeZone: TZ });
-    expect(first).toEqual({ filed: 0, sent: section.id, problem: null });
+    expect(first).toEqual({ filed: 0, questions: 0, sent: section.id, problem: null });
     // The results key was made and saved once
     expect(s.calls.filter((c) => c.url === '/api/results-key' && c.method === 'PUT')).toHaveLength(1);
-    const job = s.calls.find((c) => c.url === '/ai/work')!.body as { id: string; accountId: string; neededBy: string; note: string; pages: { page: number; fp: string; image: string }[] };
-    expect(job.pages.map((p) => p.page)).toEqual([2]); // pages 1, 3, 4 are text only; page 5 isn't covered
-    expect(job.pages[0]!.image.length).toBeGreaterThan(1000);
+    const job = s.calls.find((c) => c.url === '/ai/work')!.body as {
+      id: string;
+      accountId: string;
+      neededBy: string;
+      note: string;
+      pages: { page: number; fp: string; text: string; image: string | null }[];
+      questions: { requests: { pages: number[]; count: number; mix: { choice: number[]; short: number } }[]; avoid: string[] };
+    };
+    // Every covered page goes for the bank (page 5 isn't covered); only page 2, with a graph, goes as a picture
+    expect(job.pages.map((p) => p.page)).toEqual([1, 2, 3, 4]);
+    expect(job.pages.map((p) => p.image !== null)).toEqual([false, true, false, false]);
+    expect(job.pages[1]!.image!.length).toBeGreaterThan(1000);
+    expect(job.pages[0]!.text).toContain('Words on page 1.');
+    // The bank's plan: the app's planBank, at least MIN_BANK questions over the covered pages
+    const asked = job.questions.requests.reduce((t, r) => t + r.count, 0);
+    expect(asked).toBeGreaterThanOrEqual(10);
+    expect(job.questions.requests.flatMap((r) => r.pages).sort()).toEqual([1, 2, 3, 4]);
+    expect(job.questions.avoid).toEqual([]);
     // The planner first wants the section tomorrow (day 1 of its first week), from the study day's start
     expect(job.neededBy).toBe(new Date('2026-11-27T04:00:00').toISOString());
     // The note is sealed: no deck id or page in it, for the helper
@@ -143,11 +183,16 @@ describe('background work, end to end', () => {
     expect(JSON.stringify(job)).not.toContain(deck.id);
     expect(unpackNote(job.note).iv).toHaveLength(12);
 
-    // The batch runs; the next round files the reading and confirms it
+    // Reading in one batch, the questions in the next; then the device files both and confirms
     clock = new Date(NOW.getTime() + HOUR);
     await s.queue.tick();
+    clock = new Date(NOW.getTime() + 2 * HOUR);
+    await s.queue.tick();
     const second = await workOnce(store, { fetcher: s.fetcher, now: () => clock, timeZone: TZ });
-    expect(second).toMatchObject({ filed: 1, problem: null });
+    expect(second).toMatchObject({ filed: 1, questions: asked, problem: null });
+    const banked = await store.listQuestions(section.id);
+    expect(banked).toHaveLength(asked);
+    expect(new Set(banked.map((q) => q.page))).toEqual(new Set(job.questions.requests.map((r) => r.pages[0])));
     const [reading] = await store.listPageReadings(deck.id);
     expect(reading).toMatchObject({ page: 2, model: 'claude-sonnet-5-5', kinds: ['graph'], figures: [{ label: 'Graph', description: 'A zig-zag line.' }] });
     expect(reading!.fingerprint.text).toMatch(/^[0-9a-f]{64}$/);
@@ -158,7 +203,7 @@ describe('background work, end to end', () => {
     expect(s.queue.resultsFor('me')).toEqual([]);
     expect((await store.getWorkState()).sent).toEqual({});
 
-    // Nothing more to send: the section's pictures are read
+    // Nothing more to send: the pictures are read and the bank is full
     const third = await workOnce(store, { fetcher: s.fetcher, now: () => clock, timeZone: TZ });
     expect(third!.sent).toBeNull();
     expect(s.calls.filter((c) => c.url === '/ai/work')).toHaveLength(1);
@@ -206,8 +251,10 @@ describe('background work, end to end', () => {
     await setUp(dataKey);
     const s = servers();
     await workOnce(store, { fetcher: s.fetcher, now: () => clock, timeZone: TZ });
-    clock = new Date(NOW.getTime() + HOUR);
-    await s.queue.tick();
+    for (const h of [1, 2]) {
+      clock = new Date(NOW.getTime() + h * HOUR);
+      await s.queue.tick();
+    }
     // Another device of the account, same data key, but without the class and its deck yet
     const pc = store;
     forgetResultsKeys(pc);
@@ -228,8 +275,10 @@ describe('background work, end to end', () => {
     await setUp();
     const s = servers();
     await workOnce(store, { fetcher: s.fetcher, now: () => clock, timeZone: TZ });
-    clock = new Date(NOW.getTime() + HOUR);
-    await s.queue.tick();
+    for (const h of [1, 2]) {
+      clock = new Date(NOW.getTime() + h * HOUR);
+      await s.queue.tick();
+    }
     // The same AI sign-in, but another Honed account (another results key) on another device
     const mine = store;
     forgetResultsKeys(mine);
@@ -247,6 +296,54 @@ describe('background work, end to end', () => {
     store = mine;
     s.swapKey(held);
     expect(await workOnce(store, { fetcher: s.fetcher, now: () => clock, timeZone: TZ })).toMatchObject({ filed: 1 });
+  });
+
+  it('sends only the pictures for a bank already filled while open, and a page’s earlier reading with its text', async () => {
+    const { deck, section } = await setUp();
+    const s = servers();
+    // The bank was filled while the app was open (Make quiz questions now), at every level (#123)
+    await store.addQuestions(
+      section.id,
+      Array.from({ length: 30 }, (_, i) => ({ form: 'choice' as const, level: (1 + (i % 3)) as 1 | 2 | 3, page: 1 + (i % 4), question: `Old question ${i}?`, options: ['a', 'b', 'c', 'd'] as [string, string, string, string], answer: 0 as const, explanation: '' })),
+    );
+    await workOnce(store, { fetcher: s.fetcher, now: () => clock, timeZone: TZ });
+    const job = s.calls.find((c) => c.url === '/ai/work')!.body as { pages: { page: number; image: string | null }[]; questions?: unknown };
+    expect(job.pages.map((p) => p.page)).toEqual([2]);
+    expect(job.questions).toBeUndefined();
+
+    // Later the bank is emptied (say the class's questions were deleted): page 2 was read, so its reading goes in its text
+    for (const h of [1, 2]) {
+      clock = new Date(NOW.getTime() + h * HOUR);
+      await s.queue.tick();
+    }
+    await workOnce(store, { fetcher: s.fetcher, now: () => clock, timeZone: TZ });
+    expect(await store.listPageReadings(deck.id)).toHaveLength(1);
+    const banked = await store.listQuestions(section.id);
+    for (const q of banked) await store.deleteQuestion(q.id);
+    await workOnce(store, { fetcher: s.fetcher, now: () => clock, timeZone: TZ });
+    const again = s.calls.filter((c) => c.url === '/ai/work').at(-1)!.body as { pages: { page: number; text: string; image: string | null }[]; questions: unknown };
+    expect(again.pages.map((p) => p.image)).toEqual([null, null, null, null]); // nothing left to read
+    expect(again.pages[1]!.text).toContain('[Graph] A zig-zag line.');
+    expect(again.questions).toBeDefined();
+  });
+
+  it('plans questions for a page that is only a picture (its reading comes in the same job), and drops repeats', async () => {
+    const { section } = await setUp(undefined, true);
+    const s = servers();
+    await store.addQuestions(section.id, [{ form: 'choice', level: 1, page: 1, question: 'Which value is shown 1?', options: ['a', 'b', 'c', 'd'], answer: 0, explanation: '' }]);
+    await workOnce(store, { fetcher: s.fetcher, now: () => clock, timeZone: TZ });
+    const job = s.calls.find((c) => c.url === '/ai/work')!.body as { pages: { page: number; text: string }[]; questions: { requests: { pages: number[] }[] } };
+    expect(job.pages.find((p) => p.page === 2)!.text).toBe('');
+    expect(job.questions.requests.flatMap((r) => r.pages)).toContain(2);
+    for (const h of [1, 2]) {
+      clock = new Date(NOW.getTime() + h * HOUR);
+      await s.queue.tick();
+    }
+    const round = await workOnce(store, { fetcher: s.fetcher, now: () => clock, timeZone: TZ });
+    // The fake writer's first question repeats the one already in the bank: it isn't added twice
+    const banked = await store.listQuestions(section.id);
+    expect(banked.filter((q) => q.question === 'Which value is shown 1?')).toHaveLength(1);
+    expect(round!.questions).toBe(banked.length - 1);
   });
 
   it('binds results to the account by its public key', async () => {
