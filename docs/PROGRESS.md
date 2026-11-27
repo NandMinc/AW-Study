@@ -69,6 +69,7 @@ slides" and "M6: AI helper and quizzes":
 | After-class reminder: a popup when Honed opens links to the lecture to fill in | #129 | Matt's Claude | new `src/ui/AfterClass.tsx` and `src/ui/after-class.ts` (+ tests), its place in `src/App.tsx`, `tests/browsers/after-class.spec.ts` | **Done** (PR #132). Try on a real phone after deploy |
 | First-run tutorial: a short tour, then Getting started on Tasks | #136 | Matt's Claude | new `src/ui/GettingStarted.tsx` and `src/ui/getting-started.ts` (+ tests), `start` in `planning.ts`, its place in `TasksScreen.tsx`, `#/tour` and `#/classes/new` (`route.ts`, `App.tsx`, `ClassesScreen.tsx`), Help in `SettingsScreen.tsx`, the `storageState` in `playwright.config.ts`, `tests/browsers/first-run.spec.ts` | **Done** (PR #137). Milestone 8 is done |
 | Animate the site, step 1: the nav bar's pill slides, buttons fill in on hover and press | #143 | Matt's Claude | `NavBar.tsx` (the pill, `data-at`), the nav bar styles in `src/app.css`, the pill tests in `tests/browsers/look.spec.ts`, the nav bar part of `docs/design/README.md` | **Done** (PR #144). Later steps get their own issues |
+| Nav bar: hover rings the icon, the pill moves only with the page | #147 | Matt's Claude | the nav bar styles in `src/app.css`, the pill tests in `tests/browsers/look.spec.ts`, the nav bar part of `docs/design/README.md` | **Done** (PR #148) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -152,6 +153,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 26 (#147):** From Matt on desktop: the pill following the mouse looked odd. Now it stays under the page you're
+  on and slides only when the page changes (a click or tap). Hovering another icon draws a green ring around it
+  (`box-shadow`, inside `@media (hover: hover)`), never on the current page. Focus and press no longer move it either.
+  4 deliberate breaks, all caught.
 - **Nov 26 (#145):** Docs only. Nathan and Matt's starting list of file types is in DESIGN.md's "File types to
   support": main information (Google Slides, Google Docs, `.docx`, `.pptx`, `.pdf`, `.txt`, `.md`) and supplemental
   information (`.jpg`, `.png`, `.svg`, code files), each with what works today and its open questions. Not a commitment
