@@ -346,7 +346,7 @@ async function sendNext(store: StudyStore, key: ResultsKey, accountId: string, s
         throw new WorkProblem('A section has more pages than a day’s AI work: split it into smaller sections.');
       }
       if (!res.ok) throw new WorkProblem('The AI helper couldn’t take the work right now.');
-      state.sent[id] = { sectionId: section.id, deckId: section.deckId, pages: sendPages.map((s) => s.page), sentAt: now.toISOString() };
+      state.sent[id] = { sectionId: section.id, deckId: section.deckId, pages: sendPages.map((s) => s.page), sentAt: now.toISOString(), neededBy: body.neededBy };
       return section.id;
     } finally {
       await close();

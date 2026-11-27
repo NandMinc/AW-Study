@@ -83,6 +83,7 @@ slides" and "M6: AI helper and quizzes":
 | Reading pictures, step 5: the reading job (5a helper round, 5b storage, 5c the app sending pages) | #168 | Nathan's Claude | 5c: new `src/reading/work.ts`, `WorkRunner.tsx`, `src/db/work.ts`, `drawPagePng` in `src/reading/scan.ts`, the job note in `helper/queue.mjs`; 5b: new `src/types/reading.ts`, `src/db/readings.ts` (+ test), schema step 10, `ENTITY_STORE` and the sync server's entities, the cascades in `src/db/lectures.ts`; 5a: `helper/rounds.mjs`, `helper/reading.mjs` (moved from `tools/read-pages`), image support in `helper/claude.mjs`, `helper/server.mjs`, `tests/helper/reading.test.mjs` | **Done**: 5a (PR #169), 5b (PR #170), 5c (this PR). Live once `site-honed` and `honed-ai` update; nothing shows the readings yet (step 7) |
 | Reading pictures, step 6: questions by difficulty with the blind check (6a helper rounds, 6b app) | #172 | Nathan's Claude | 6b: `src/reading/work.ts` (the bank plan, text pages, filing questions), `src/reading/work.test.ts`; 6a: `questionRounds` in `helper/rounds.mjs`, the question plan and quick rounds in `helper/queue.mjs`, `helper/server.mjs`, `tests/helper/questions.test.mjs` | **Done**: 6a (PR #173), 6b (this PR). Live once `site-honed` updates |
 | Reading pictures, step 7: Explain, Ask and Box use the readings, a page read now | #175 | Nathan's Claude | `helper/jobs.mjs` (pictures for explain/ask, the `read` job), `readPage` in `helper/rounds.mjs`, `helper/app.mjs`; `src/ai/` (`readPage`, pictures), new `src/reading/explain.ts`, `drawAreaPng` in `src/reading/scan.ts`, `prepare` in `src/viewer/AnnotatedViewer.tsx`, `src/ui/DeckSlides.tsx` | **Done** (this PR) |
+| Reading pictures, step 8: the quiz button while questions are being written | #177 | Nathan's Claude | new `src/reading/pending.ts` (+ test), new `src/ui/QuizWaiting.tsx`, the Quiz link in `src/ui/TasksScreen.tsx`, the start part of `src/ui/QuizScreen.tsx`, `neededBy` in `src/db/work.ts`, `.link-button` in `src/app.css`, a test in `tests/browsers/play.spec.ts` | **Done** (this PR). The build plan of "Reading pictures and choosing models" is finished |
 
 ## Milestones
 
@@ -165,6 +166,14 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 27 (#177):** A quiz whose questions are being written in the background (sent by this device, not given up on,
+  bank still empty): on Tasks its Quiz looks greyed out but still answers a tap (aria-disabled), opening "Your quiz is
+  still being written / Questions for slides 2–4 will be ready for your next study session (Thursday, 4:00 AM)." with
+  Study the pages now and OK ("within a day" without a session, "Almost ready" from 2 hours before). The Quiz page
+  shows the same instead of Make questions, so they aren't paid for twice. Gotcha: Playwright waits forever on an
+  aria-disabled button, so the test taps it with `force`. 4 unit + 1 browser test (3 devices); 3 deliberate breaks
+  caught (after two runs that tested an old build because the break didn't compile: check the build succeeded).
+  **The build plan of #151 is finished** (steps 1-8).
 - **Nov 27 (#175):** Explain this and Ask about this use the readings: the slide and its neighbours go with what the AI read
   on their pictures; a slide with pictures not read yet is read now (`/ai/read`: Haiku, then Sonnet for hard content, the
   same `readPage` as the batch) and saved, so the batch skips it; a box goes as a picture of its area. So a box with no

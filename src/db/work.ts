@@ -22,6 +22,8 @@ export interface SentWork {
   deckId: string;
   pages: number[];
   sentAt: string;
+  /** When the next study session using it starts (the job's deadline), for "ready by" messages (#177). */
+  neededBy?: string | null;
   /** The helper gave up on it: not sent again until WORK.retryAfterMs has passed. */
   failedAt?: string;
 }

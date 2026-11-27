@@ -1,3 +1,6 @@
+import { slidesLabel } from './classes';
+import { questionsBeingWritten, type Writing } from '../reading/pending';
+import { QuizWaitingButton } from './QuizWaiting';
 // The Tasks page (#/, the home page; docs/design/README.md "Tasks", #77): today's work by class, in
 // the order the user drags them into, from src/plan/tasks.ts. A progress bar, Start (Play, in this
 // order), and a row per class that opens to its lectures, each with its slides and its quiz. No times
@@ -21,6 +24,8 @@ import { messageOf, useLoad } from './useLoad';
 export function TasksScreen({ tour = false }: { tour?: boolean }) {
   const store = useStore();
   const { data, error } = useLoad(() => loadPlanning(store), [store]);
+  // Sections whose questions are still being written in the background (#177): their Quiz says when it'll be ready
+  const { data: writing } = useLoad(() => questionsBeingWritten(store), [store]);
   const [order, setOrder] = useState<string[]>([]);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [problem, setProblem] = useState<string | null>(null);
@@ -212,7 +217,7 @@ export function TasksScreen({ tour = false }: { tour?: boolean }) {
                   {isOpen && (
                     <ul className="task-lectures">
                       {c.items.map((t) => (
-                        <LectureRow key={itemId(t)} task={t} place={place(t.item.sectionId)!} fresh={fresh.has(itemId(t))} />
+                        <LectureRow key={itemId(t)} task={t} place={place(t.item.sectionId)!} fresh={fresh.has(itemId(t))} writing={writing?.get(t.item.sectionId)} />
                       ))}
                     </ul>
                   )}
@@ -227,7 +232,7 @@ export function TasksScreen({ tour = false }: { tour?: boolean }) {
 }
 
 /** One lecture today: its name opens its slides, Quiz starts its quiz (a tick once done). */
-function LectureRow({ task, place, fresh }: { task: TaskItem; place: ItemPlace; fresh: boolean }) {
+function LectureRow({ task, place, fresh, writing }: { task: TaskItem; place: ItemPlace; fresh: boolean; writing?: Writing }) {
   const { course, section, deck, lecture } = place;
   const slides = href({ name: 'slides', courseId: course.id, deckId: deck.id, first: section.firstPage, last: section.lastPage });
   return (
@@ -237,6 +242,8 @@ function LectureRow({ task, place, fresh }: { task: TaskItem; place: ItemPlace; 
         <Tick label={task.item.kind === 'extra' ? 'Extra study done' : 'Quiz done'} fresh={fresh} />
       ) : task.item.kind === 'extra' ? (
         <span className="muted">Extra study</span>
+      ) : writing ? (
+        <QuizWaitingButton writing={writing} slides={slidesLabel(section.firstPage, section.lastPage)} studyHref={slides} />
       ) : (
         <a href={href({ name: 'quiz', courseId: course.id, sectionId: section.id })}>Quiz</a>
       )}

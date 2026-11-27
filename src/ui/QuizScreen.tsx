@@ -15,6 +15,8 @@ import type { Course, Section, SlideDeck } from '../types/lecture';
 import type { OptionIndex, Question, QuizAttempt } from '../types/quiz';
 import { SlideViewer } from '../viewer/SlideViewer';
 import { useAi } from './ai-context';
+import { questionsBeingWritten } from '../reading/pending';
+import { QuizWaitingNote } from './QuizWaiting';
 import { MathText } from './MathText';
 import { CompareModels } from './CompareModels';
 import { slidesLabel } from './classes';
@@ -133,6 +135,10 @@ export function Start({
   const [problem, setProblem] = useState<{ message: string; signIn: boolean } | null>(null);
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
+  // Questions being written in the background (#177): say when they'll be ready rather than make them twice
+  const { data: writingMap } = useLoad(() => questionsBeingWritten(store, [setting.section.id]), [store, setting.section.id, questions.length]);
+  const writing = questions.length === 0 ? writingMap?.get(setting.section.id) : undefined;
+  const studyHref = href({ name: 'slides', courseId: setting.course.id, deckId: setting.deck.id, first: setting.section.firstPage, last: setting.section.lastPage });
 
   const make = async () => {
     setProblem(null);
@@ -173,7 +179,9 @@ export function Start({
           Last quiz: {describeScore(last.right, last.asked, last.score)}
         </p>
       )}
-      {progress ? (
+      {writing && !progress ? (
+        <QuizWaitingNote writing={writing} slides={slidesLabel(setting.section.firstPage, setting.section.lastPage)} studyHref={studyHref} />
+      ) : progress ? (
         <div className="stack" role="status">
           <p>
             Making questions…{' '}
