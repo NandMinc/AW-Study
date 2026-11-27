@@ -485,6 +485,15 @@ normal as soon as the questions arrive.
 API account: the helper **simulates batches** on our subscriptions with Claude Code. It keeps the same queue, rounds,
 deadlines, fingerprints and results keys, and runs each "batch" itself after a set delay (configurable, so tests can make
 it slow or fast). Moving to the real Batch API later replaces only the part that sends a batch and collects the results.
+**Built (#166, `helper/queue.mjs`):** the queue lives in the helper's memory only (it has no disk; SECURITY.md allows a
+memory-only queue). Each round of a job waits for the next simulated batch (`delayMs`) unless that would miss "needed
+by" less the margin, then runs straight away; this one rule gives "a third batch if time allows". `POST
+/ai/work/<id>/now` (a study session starting) runs it at the next tick. The daily page limit puts a job on the first day
+with room for all its pages and wins over deadlines and run now; a job bigger than a day's limit is refused (split
+it). Three tries a round, then given up; jobs forgotten after 7 days, unfetched results after 30. A restart loses waiting
+work: the device finds its job unknown (404, `unknown: true`) and sends it again. Results are sealed by `helper/seal.mjs`
+(the app's construction, checked by a test that opens it with `src/lib/results-key.ts`). The routes answer 501 until
+step 5 gives the queue its first real round.
 
 **Quizzes by difficulty too** (Nathan, Nov 26: "hard content could call on a higher model as needed, while using a lower
 model when possible").
