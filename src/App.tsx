@@ -8,8 +8,9 @@ import { ClassesScreen } from './ui/ClassesScreen';
 import { ClassScreen } from './ui/ClassScreen';
 import { VaultContext } from './ui/lock-parts';
 import { mainPage, NavBar } from './ui/NavBar';
+import { pageKey, pageMotion, type PageMotion } from './ui/page-motion';
 import { AfterClass } from './ui/AfterClass';
-import { go, href, useRoute } from './ui/route';
+import { go, href, useRoute, type Route } from './ui/route';
 import { DAY_START_HOUR } from './ui/settings';
 import { SettingsScreen } from './ui/SettingsScreen';
 import { SetupScreen } from './ui/SetupScreen';
@@ -59,6 +60,7 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
     go({ name: 'tasks' });
   };
   const page = status === 'unlocked' ? mainPage(route) : null;
+  const motion = usePageMotion(route, status === 'unlocked');
 
   return (
     <VaultContext value={vault}>
@@ -82,7 +84,12 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
           {status === 'unlocked' && <UpdateBanner />}
           {status === 'unlocked' && <BankJobsStatus />}
           {status === 'unlocked' && <SyncRunner onChanged={() => setDataVersion((v) => v + 1)} />}
-          {status === 'unlocked' && <Screen route={route} onLock={lock} dataVersion={dataVersion} onReplaced={() => setDataVersion((v) => v + 1)} />}
+          {status === 'unlocked' && (
+            // A new screen slides in from where it comes from (#149); the header, footer and nav bar stay put
+            <div key={pageKey(route)} className={motion ? `page page-${motion}` : 'page'} data-motion={motion ?? undefined}>
+              <Screen route={route} onLock={lock} dataVersion={dataVersion} onReplaced={() => setDataVersion((v) => v + 1)} />
+            </div>
+          )}
           {page && <AfterClass page={page} />}
         </main>
         <Footer wide={wide} slidesPage={slidesPage} nav={page !== null} />
@@ -91,6 +98,21 @@ export default function App({ store, vault }: { store: StudyStore; vault: Vault 
       </StoreContext>
     </VaultContext>
   );
+}
+
+/** How the current screen came in (#149): from the last screen shown while unlocked; none at first, or after unlocking. */
+function usePageMotion(route: Route, unlocked: boolean): PageMotion | null {
+  const [last, setLast] = useState<{ route: Route; motion: PageMotion | null; unlocked: boolean }>({ route, motion: null, unlocked });
+  if (last.unlocked !== unlocked) {
+    setLast({ route, motion: null, unlocked });
+    return null;
+  }
+  if (pageKey(last.route) !== pageKey(route)) {
+    const motion = pageMotion(last.route, route);
+    setLast({ route, motion, unlocked });
+    return motion;
+  }
+  return last.motion;
 }
 
 function Screen({

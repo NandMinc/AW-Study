@@ -13,6 +13,9 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
+    // Reduced motion (#149): a test that measures a box or a colour never catches a page mid-slide. The tests of
+    // the motion itself (motion.spec.ts, the nav bar's pill in look.spec.ts) turn it back on.
+    contextOptions: { reducedMotion: 'reduce' },
     // Every test starts past the first run's tour and Getting started (#136), as if seen: they'd stand in front of
     // every screen. tests/browsers/first-run.spec.ts starts without this. localhost too: the passkey test uses it.
     storageState: {

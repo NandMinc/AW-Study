@@ -70,6 +70,7 @@ slides" and "M6: AI helper and quizzes":
 | First-run tutorial: a short tour, then Getting started on Tasks | #136 | Matt's Claude | new `src/ui/GettingStarted.tsx` and `src/ui/getting-started.ts` (+ tests), `start` in `planning.ts`, its place in `TasksScreen.tsx`, `#/tour` and `#/classes/new` (`route.ts`, `App.tsx`, `ClassesScreen.tsx`), Help in `SettingsScreen.tsx`, the `storageState` in `playwright.config.ts`, `tests/browsers/first-run.spec.ts` | **Done** (PR #137). Milestone 8 is done |
 | Animate the site, step 1: the nav bar's pill slides, buttons fill in on hover and press | #143 | Matt's Claude | `NavBar.tsx` (the pill, `data-at`), the nav bar styles in `src/app.css`, the pill tests in `tests/browsers/look.spec.ts`, the nav bar part of `docs/design/README.md` | **Done** (PR #144). Later steps get their own issues |
 | Nav bar: hover rings the icon, the pill moves only with the page | #147 | Matt's Claude | the nav bar styles in `src/app.css`, the pill tests in `tests/browsers/look.spec.ts`, the nav bar part of `docs/design/README.md` | **Done** (PR #148) |
+| Animate the site, step 2: page transitions | #149 | Matt's Claude | new `src/ui/page-motion.ts` (+ test), the screen's wrapper and `usePageMotion` in `src/App.tsx`, the page transition styles in `src/app.css`, reduced motion by default in `playwright.config.ts`, `tests/browsers/motion.spec.ts`, the motion part of `docs/design/README.md` | **Done** (PR #150) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -152,6 +153,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 26 (#149):** Page transitions. A new screen slides in 1.5rem and fades in over 0.24 s, from the side it comes
+  from (`src/ui/page-motion.ts`). Between Tasks, Classes and Settings it follows the nav bar's order. Going deeper (a
+  class, then What was covered?, the slides, a quiz, practice or Play) comes from the right, going back from the left,
+  and the same depth fades. A change within one screen (a class's part, a quiz's comparison) doesn't move, and neither
+  does the first screen after unlocking. Enter only: there's no exit animation, so a click is never held up. The
+  header, footer and nav bar stay put. With reduced motion nothing moves. **Browser tests now default to reduced
+  motion** (`playwright.config.ts`): see Gotchas. 8 deliberate breaks, all caught.
 
 - **Nov 26 (#147):** From Matt on desktop: the pill following the mouse looked odd. Now it stays under the page you're
   on and slides only when the page changes (a click or tap). Hovering another icon draws a green ring around it
@@ -632,6 +641,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- **Browser tests run with reduced motion** (#149, `playwright.config.ts`): no page slides or pill movement, so a
+  test that measures a box or a colour never catches a screen mid-slide. A test of motion turns it back on with
+  `test.use({ contextOptions: { reducedMotion: 'no-preference' } })` (`motion.spec.ts`, the pill in `look.spec.ts`).
+  The screen's wrapper (`main > .page`) is keyed by `pageKey`: a new key is a new screen and slides in.
 - **The nav bar must stay one element between the three main pages** (#143): its pill slides from the old page to
   the new one only because React keeps the same `<nav>`. Don't give `NavBar` a `key`, or render it inside each page.
   Hover styles go inside `@media (hover: hover)`, or a phone keeps a tapped button "hovered".
