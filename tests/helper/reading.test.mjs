@@ -44,7 +44,7 @@ describe('the reading round', () => {
     const r = round([{ result: reading(['text']) }]);
     const cache = new Map();
     const out = await r.run({ pages: [page(51), page(52, null)], person: 'person2', cache });
-    expect(out.carry.readings).toEqual([{ page: 51, fp: fp(51), model: READING_MODELS.first, reading: JSON.parse(reading(['text'])) }]);
+    expect((out.carry ?? out.output).readings).toEqual([{ page: 51, fp: fp(51), model: READING_MODELS.first, reading: JSON.parse(reading(['text'])) }]);
     const [call] = calls(); // page 52 had no picture: nothing to read
     expect(calls()).toHaveLength(1);
     expect(modelOf(call)).toBe('claude-haiku-5-5');
@@ -64,14 +64,14 @@ describe('the reading round', () => {
     const r = round([{ result: reading(['chemistry']) }, { result: sonnet }, { result: reading(['photo'], { unsure: true, unsureWhy: 'blurry' }) }, { result: reading(['photo']) }]);
     const out = await r.run({ pages: [page(1), page(2)], person: 'person2', cache: new Map() });
     expect(calls().map(modelOf)).toEqual(['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-sonnet-5-5']);
-    expect(out.carry.readings.map((x) => x.model)).toEqual(['claude-sonnet-5-5', 'claude-sonnet-5-5']);
-    expect(out.carry.readings[0].reading.figures[0].label).toBe('Figure 2.4'); // Sonnet's, not Haiku's
+    expect((out.carry ?? out.output).readings.map((x) => x.model)).toEqual(['claude-sonnet-5-5', 'claude-sonnet-5-5']);
+    expect((out.carry ?? out.output).readings[0].reading.figures[0].label).toBe('Figure 2.4'); // Sonnet's, not Haiku's
   });
 
   it('asks once more for an unusable answer, and fails the round after two', async () => {
     const r = round([{ result: 'Sorry, I can’t.' }, { result: reading(['text']) }]);
     const out = await r.run({ pages: [page(1)], person: 'person2', cache: new Map() });
-    expect(out.carry.readings).toHaveLength(1);
+    expect((out.carry ?? out.output).readings).toHaveLength(1);
     expect(calls()).toHaveLength(2);
 
     rmSync(join(dir, 'calls.jsonl'));
@@ -85,8 +85,18 @@ describe('the reading round', () => {
     await r.run({ pages: [page(1)], person: 'person2', cache });
     const out = await r.run({ pages: [page(1), page(2)], carry: { earlier: true }, person: 'person2', cache });
     expect(calls()).toHaveLength(2); // page 1 the first time, page 2 the second
-    expect(out.carry.earlier).toBe(true);
-    expect(out.carry.readings.map((x) => x.page)).toEqual([1, 2]);
+    expect((out.carry ?? out.output).earlier).toBe(true);
+    expect((out.carry ?? out.output).readings.map((x) => x.page)).toEqual([1, 2]);
+  });
+
+  it('finishes a reading-only job; with a question plan, passes on and says when it read nothing (quick)', async () => {
+    const r = round([{ result: reading(['text']) }]);
+    const plan = { questions: { requests: [], guide: null, avoid: [] } };
+    const cache = new Map();
+    expect(await r.run({ pages: [page(1)], person: 'person2', cache })).toMatchObject({ done: true });
+    expect(await r.run({ pages: [page(1)], plan, person: 'person2', cache })).toMatchObject({ quick: true, carry: { readings: [{ page: 1 }] } });
+    expect(await r.run({ pages: [page(2)], plan, person: 'person2', cache })).toMatchObject({ quick: false });
+    expect(await r.run({ pages: [page(3, null)], plan, person: 'person2', cache })).toMatchObject({ quick: true, carry: { readings: [] } });
   });
 
   it('refuses to run for someone it has no token for', async () => {

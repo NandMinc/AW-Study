@@ -11,6 +11,7 @@
 // them, and the device sends them again (it finds its job unknown). Results are sealed the moment a job is
 // done (./seal.mjs), so only the student's unlocked devices can open them; the device fetches and confirms
 // them, and they're deleted.
+import { InputError, JOBS } from './jobs.mjs';
 import { sealResult } from './seal.mjs';
 
 export const QUEUE = {
@@ -24,6 +25,8 @@ export const QUEUE = {
   maxQueuedBytes: 300 * 1024 * 1024,
   /** A job's note (sealed by the device with its own key: the helper can't read it), base64url characters. */
   maxNote: 64 * 1024,
+  /** Question groups in one job (a section of 60 pages in groups of 5 is 12). */
+  maxRequests: 20,
   /** Tries per round before a job is given up. */
   maxAttempts: 3,
   /** Jobs are forgotten this long after they arrive, whatever their state. */
@@ -49,7 +52,7 @@ export class WorkError extends Error {
 export function validateWork(body) {
   const bad = (m) => new WorkError(400, m);
   if (typeof body !== 'object' || body === null) throw bad('Send a JSON object.');
-  const { id, accountId, publicKey, neededBy, pages, note } = body;
+  const { id, accountId, publicKey, neededBy, pages, note, questions } = body;
   if (typeof id !== 'string' || !ID.test(id)) throw bad('id: letters, digits, - and _ only, 1 to 64.');
   if (typeof accountId !== 'string' || !ID.test(accountId)) throw bad('accountId: letters, digits, - and _ only, 1 to 64.');
   if (typeof publicKey !== 'string' || !/^[\w-]{87}$/.test(publicKey)) throw bad('publicKey: a P-256 public key, base64url.');
@@ -79,7 +82,40 @@ export function validateWork(body) {
   if (note !== undefined && note !== null && (typeof note !== 'string' || note.length > QUEUE.maxNote || !/^[\w-]*$/.test(note))) {
     throw bad(`note: base64url, at most ${QUEUE.maxNote} characters.`);
   }
-  return { id, accountId, publicKey: new Uint8Array(Buffer.from(publicKey, 'base64url')), neededBy: needed, pages: decoded, note: note ?? null };
+  return {
+    id,
+    accountId,
+    publicKey: new Uint8Array(Buffer.from(publicKey, 'base64url')),
+    neededBy: needed,
+    pages: decoded,
+    note: note ?? null,
+    plan: questions === undefined || questions === null ? null : { questions: questionPlan(questions, decoded) },
+  };
+}
+
+/**
+ * A job's question plan (#172): the device's planBank groups (page numbers from the job, a count, a mix of levels),
+ * with the class's guide and the questions already in the bank to avoid. Each group is checked exactly as the
+ * `questions` job checks a request (helper/jobs.mjs), with the pages' text as sent, so a bad plan is refused now.
+ */
+function questionPlan(value, pages) {
+  const bad = (m) => new WorkError(400, `questions: ${m}`);
+  if (typeof value !== 'object' || value === null) throw bad('an object.');
+  const { requests, guide, avoid } = value;
+  if (!Array.isArray(requests) || requests.length === 0 || requests.length > QUEUE.maxRequests) throw bad(`1 to ${QUEUE.maxRequests} requests.`);
+  const text = new Map(pages.map((p) => [p.page, p.text]));
+  try {
+    const checked = requests.map((r, i) => {
+      if (typeof r !== 'object' || r === null || !Array.isArray(r.pages) || r.pages.some((n) => !text.has(n))) throw bad(`requests[${i}].pages: pages of this job.`);
+      const input = JOBS.questions.validate({ pages: r.pages.map((n) => ({ page: n, text: text.get(n) })), count: r.count, mix: r.mix, avoid: [], guide });
+      return { pages: r.pages, count: input.count, mix: input.mix ?? { choice: [0, input.count, 0], short: 0 } };
+    });
+    const kept = JOBS.questions.validate({ pages: [{ page: 1, text: 'x' }], count: 1, avoid: avoid ?? [], guide });
+    return { requests: checked, guide: kept.guide ?? null, avoid: kept.avoid };
+  } catch (err) {
+    if (err instanceof InputError) throw bad(err.message);
+    throw err;
+  }
 }
 
 const dayOf = (ms) => new Date(ms).toISOString().slice(0, 10);
@@ -87,9 +123,11 @@ const startOf = (day) => Date.parse(`${day}T00:00:00.000Z`);
 
 /**
  * @param {object} options
- * @param {{ name: string, run: (ctx: object) => Promise<{ carry?: unknown, done?: boolean, output?: unknown }> }[]} options.rounds
- *   in order. A round gets { jobId, pages, carry, neededBy, person, cache } and gives the next round its carry, or
- *   finishes the job early with { done: true, output }. After the last round the job's output is its carry.
+ * @param {{ name: string, run: (ctx: object) => Promise<{ carry?: unknown, done?: boolean, output?: unknown, quick?: boolean }> }[]} options.rounds
+ *   in order. A round gets { jobId, pages, carry, plan, neededBy, person, cache } and gives the next round its carry,
+ *   or finishes the job early with { done: true, output }. `quick: true` (it did no AI work) lets the next round run
+ *   at the next tick instead of the next batch. After the last round the job's output is its carry. `plan` is the
+ *   job's question plan ({ questions } or null).
  *   `cache` is a Map for this person that lasts across their jobs (pages already read, by keyed fingerprint).
  * @param {number} options.delayMs   how long a batch takes to come round
  * @param {number} options.marginMs  how long before "needed by" a job must be done
@@ -189,7 +227,7 @@ export function createQueue(options) {
     caches.set(job.person, cache);
     let r;
     try {
-      r = await round.run({ jobId: job.id, pages: job.pages, carry: job.carry, neededBy: job.neededBy, person: job.person, cache });
+      r = await round.run({ jobId: job.id, pages: job.pages, carry: job.carry, plan: job.plan ?? null, neededBy: job.neededBy, person: job.person, cache });
     } catch (err) {
       job.attempts += 1;
       log({ work: 'round failed', person: job.person, round: round.name, attempt: job.attempts, error: err instanceof Error ? err.name : 'unknown' });
@@ -218,7 +256,8 @@ export function createQueue(options) {
     job.carry = r?.carry;
     job.round += 1;
     job.state = 'waiting';
-    job.readyAt = nextReadyAt(job, now());
+    // A round that did no AI work (nothing to read) doesn't make the next one wait for a batch
+    job.readyAt = r?.quick ? Math.max(now(), startOf(job.day)) : nextReadyAt(job, now());
   }
 
   /** Runs every job whose time has come, one at a time; forgets old jobs and results. Safe to call often. */

@@ -173,6 +173,15 @@ describe('the queue', () => {
     expect(await openedNote(q, 'nathan', 'k')).toBeNull();
   });
 
+  it('runs the next round at once after a round that did no AI work', async () => {
+    const q = queue({ rounds: [{ name: 'read', run: async () => ({ carry: [], quick: true }) }, ...rounds(['questions'])] });
+    q.submit('nathan', work('j'));
+    await at(T0 + HOUR, q);
+    expect(q.get('nathan', 'j')).toMatchObject({ round: 'questions', readyAt: new Date(T0 + HOUR).toISOString() });
+    await at(T0 + HOUR + 30_000, q);
+    expect(q.get('nathan', 'j').state).toBe('done');
+  });
+
   it('finishes early when a round says so', async () => {
     const q = queue({
       rounds: [
