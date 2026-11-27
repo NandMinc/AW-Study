@@ -139,6 +139,7 @@ test.describe('the nav bar pill slides', () => {
       return Math.round(Math.abs(pill.left + pill.width / 2 - (button.left + button.width / 2)));
     }, label);
   const colour = (page: Page, label: string) => navBar(page).getByRole('link', { name: label }).evaluate((a) => getComputedStyle(a).color);
+  test.use({ contextOptions: { reducedMotion: 'no-preference' } }); // tests default to reduced motion (#149)
 
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });

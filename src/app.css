@@ -936,6 +936,56 @@ button.link {
   height: 1.75rem;
 }
 
+/* --- Page transitions (#149, page-motion.ts): a new screen slides in a little from the side it comes from.
+   Enter only, and the transform is gone once it ends (fill: backwards): a moved box would be the
+   containing block of anything fixed inside the screen (dialogs). --- */
+
+.page-forward,
+.page-back,
+.page-fade {
+  animation: 0.24s cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+}
+
+.page-forward {
+  animation-name: page-from-right;
+}
+
+.page-back {
+  animation-name: page-from-left;
+}
+
+.page-fade {
+  animation-name: page-fade-in;
+}
+
+@keyframes page-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(1.5rem);
+  }
+}
+
+@keyframes page-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-1.5rem);
+  }
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-forward,
+  .page-back,
+  .page-fade {
+    animation: none;
+  }
+}
+
 /* Room under the last thing on the page, so the bar never covers it */
 .foot.above-nav {
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));

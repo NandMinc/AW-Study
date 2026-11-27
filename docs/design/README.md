@@ -46,6 +46,17 @@ page when you click or tap another. With a mouse, hovering over another icon dra
 the pill doesn't follow the mouse (that looked odd). A pressed button shrinks a little. Phones get no
 hover ring, and nothing moves for someone who has turned on reduced motion.
 
+## Page transitions (#149)
+
+A new screen slides in a little (1.5rem) and fades in, quickly (0.24 s), from the side it comes from:
+- between Tasks, Classes and Settings, in the nav bar's order (Settings comes in from the right after Tasks);
+- deeper (a class, then What was covered?, the slides, a quiz, practice or Play) comes in from the right;
+- back comes in from the left;
+- between screens at the same depth, it only fades.
+
+The header, the footer and the nav bar stay where they are. Only the new screen moves in: the old one doesn't
+animate out, so tapping is never held up. Nothing moves for someone who has turned on reduced motion.
+
 The nav bar is on the three main pages only. Full-screen screens (the slide viewer, a quiz, Play,
 editing a class) hide it and have a back button instead (our call).
 
