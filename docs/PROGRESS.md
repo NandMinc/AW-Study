@@ -78,6 +78,7 @@ slides" and "M6: AI helper and quizzes":
 | Design: read pictures at upload, and choose models by difficulty (reading and quizzes) | #151 | Nathan's Claude | `docs/DESIGN.md` ("Reading pictures and choosing models", a line of "Decisions so far") | **Done** (PR #152, Matt's OK). Built in its own issues, in the design's build order |
 | Reading pictures, step 1: model test (Haiku vs Sonnet vs Opus on real pages) | #155 | Nathan's Claude | new `tools/read-pages/` (the tool and the reading prompt), `tests/read-pages.test.mjs`, "Model test results" in `docs/DESIGN.md` | **Done** (this PR): a handout, a chemistry textbook and a statistics textbook |
 | Reading pictures, step 2: sort pages on the device, page fingerprints | #157 | Nathan's Claude | new `src/reading/` (`sort.ts`, `scan.ts`, tests, `calibrate.test.ts` skipped without real PDFs), optional `drawing`/`picture`/`noBar` in `src/viewer/test-pdf.ts` | **Done** (this PR). Not wired in yet: the queue (step 4) calls it |
+| Reading pictures, step 3: results keys | #161 | Nathan's Claude | `docs/SECURITY.md` ("AI work in the background", the threat table, "In short", "AI requests") first; then `src/lib/`, `src/types/crypto.ts`, `sync/` | Design **waiting for Matt's OK** (this PR) |
 
 ## Milestones
 
@@ -169,7 +170,11 @@ the "Test and publish" run on `main` to finish, then press Update.
   that say which part of a formula is meant, and for each question to be read back and rewritten if awkward. Rerun:
   occurrences are named exactly ("the y inside the abstraction and the final x outside it"), and nothing awkward
   turned up. 4 deliberate breaks, all caught. **The helper changed: press Update for `honed-ai`.**
-
+- **Nov 26 (#161, design, waiting for Matt's OK):** Results keys for AI work in the background. Each account gets an
+  ECDH P-256 key pair: the public key on the server (never replaced), the private key sealed with the data key. The helper
+  seals each result to it (ephemeral ECDH + HKDF + AES-GCM), the device opens it, stores it as a record and the server
+  deletes its copy. Fingerprints go to the server HMAC'd with a per-account key (no looking textbook pages up). Waiting
+  pages are sealed with a helper-only queue key kept out of snapshots (or only in memory), 7 days at most.
 - **Nov 27 (#158):** Two prompt fixes from running the `questions` job on one of Matt's lectures (24 slides, 70 questions,
   Opus 5.5; every answer was right). (1) The right option gave itself away by length: it was at least 25% longer than
   every wrong one in 19 of 70 questions. The prompt now asks for wrong options as long and detailed as the right one:
