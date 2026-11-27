@@ -859,28 +859,111 @@ button.link {
   bottom: max(0.75rem, env(safe-area-inset-bottom));
   transform: translateX(-50%);
   z-index: 10;
-  display: flex;
-  justify-content: space-around;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.5rem;
   width: min(24rem, calc(100% - 2rem));
   padding: 0.3rem;
   border: 2px solid var(--accent);
   border-radius: var(--pill);
   background: var(--bg);
+  /* Which button the pill is under (#143): the current page, or the one hovered, focused or pressed */
+  --at: 0;
+  --col: calc((100% - 0.6rem - 1rem) / 3); /* a column's width, inside the padding and gaps */
 }
 
 .nav-bar a {
+  position: relative; /* above the pill */
   display: grid;
   place-items: center;
-  min-width: 4.5rem;
+  justify-self: center;
+  width: 4.5rem;
   min-height: 44px;
   border-radius: var(--pill);
   color: var(--accent);
+  transition: color 0.25s ease, transform 0.15s ease;
 }
 
 .nav-bar a[aria-current='page'] {
-  background: var(--fill);
   color: var(--nav-current);
+}
+
+/* The green pill: one element, sliding between the buttons */
+.nav-pill {
+  position: absolute;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  left: calc(0.3rem + var(--at) * (var(--col) + 0.5rem) + (var(--col) - 4.5rem) / 2);
+  width: 4.5rem;
+  border-radius: var(--pill);
+  background: var(--fill);
+  transition: left 0.3s cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
+.nav-bar[data-at='1'] {
+  --at: 1;
+}
+
+.nav-bar[data-at='2'] {
+  --at: 2;
+}
+
+/* Hover only where there's a mouse: on a phone a tap would leave it stuck. Focus and a press anywhere. */
+@media (hover: hover) {
+  .nav-bar:has(a:nth-of-type(1):hover) {
+    --at: 0;
+  }
+
+  .nav-bar:has(a:nth-of-type(2):hover) {
+    --at: 1;
+  }
+
+  .nav-bar:has(a:nth-of-type(3):hover) {
+    --at: 2;
+  }
+
+  .nav-bar a:hover {
+    color: var(--nav-current);
+  }
+
+  .nav-bar:has(a:hover) a[aria-current='page']:not(:hover) {
+    color: var(--accent);
+  }
+}
+
+.nav-bar:has(a:nth-of-type(1):is(:focus-visible, :active)) {
+  --at: 0;
+}
+
+.nav-bar:has(a:nth-of-type(2):is(:focus-visible, :active)) {
+  --at: 1;
+}
+
+.nav-bar:has(a:nth-of-type(3):is(:focus-visible, :active)) {
+  --at: 2;
+}
+
+.nav-bar a:is(:focus-visible, :active) {
+  color: var(--nav-current);
+}
+
+.nav-bar:has(a:is(:focus-visible, :active)) a[aria-current='page']:not(:focus-visible, :active) {
+  color: var(--accent);
+}
+
+.nav-bar a:active {
+  transform: scale(0.92);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-pill,
+  .nav-bar a {
+    transition: none;
+  }
+
+  .nav-bar a:active {
+    transform: none;
+  }
 }
 
 .nav-bar svg {
