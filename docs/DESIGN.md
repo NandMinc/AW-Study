@@ -492,10 +492,28 @@ Today Honed reads PDFs (slides and class materials) and plain text files (class 
 eventually (Nathan, Nov 22). **Whenever a new file type comes up, add it here** with where it came up; solutions are
 worked through later, one type at a time.
 
-| Type | Where it came up | Notes |
-| --- | --- | --- |
-| Word, `.docx` | Course outlines and syllabi as class materials (#117) | Only the text is needed (for the style guide), not a faithful page |
-| PowerPoint, `.pptx` | Slides (Nov 18), since exporting some decks to PDF mangles them | Needs a faithful view, not only text: options in "The slide viewer", "PowerPoint later" |
+**Starting list (Nathan and Matt, Nov 26, #145).** Neither complete nor all required, just where to start. It sorts
+files into two groups:
+
+- **Main information:** what you study from, such as class notes, slides, practice midterms and practice tests.
+- **Supplemental information:** what backs it up, such as screenshots and example code.
+
+Where supplemental files live in the app (attached to a lecture, a section, a class's materials, a note?) and whether
+the AI reads them is not decided yet.
+
+| Type | Group | Where it came up | Today | Notes and open questions |
+| --- | --- | --- | --- | --- |
+| PDF, `.pdf` | Main | Slides (milestone 4), class materials (#122) | **Works** for slides and class materials | |
+| Plain text, `.txt` | Main | Class materials (#122) | **Works** for class materials, not slides | |
+| Markdown, `.md` | Main | Class materials (#122); the Nov 26 list | Class materials take it, read as plain text | Show it formatted (headings, lists) or keep it plain? |
+| Word, `.docx` | Main | Course outlines and syllabi as class materials (#117); the Nov 26 list | No | Only the text is needed for the style guide; class notes might need a readable page view |
+| PowerPoint, `.pptx` | Main | Slides (Nov 18), since exporting some decks to PDF mangles them; the Nov 26 list | No | Needs a faithful view, not only text: options in "The slide viewer", "PowerPoint later". **Animations?** (builds that reveal a slide step by step): show them, or only the finished slide? |
+| Google Slides | Main | The Nov 26 list | No | Not a file: a link to a Google file. Ask for a download (`.pptx` or `.pdf`), or read it through Google's API with the student's sign-in (sends nothing new to our server, but needs a Google permission beyond sign-in)? **Animations?** as for `.pptx` |
+| Google Docs | Main | The Nov 26 list | No | Not a file, as Google Slides: a download (`.docx`, `.pdf`, `.txt`) or Google's API |
+| JPEG, `.jpg` / `.jpeg` | Supplemental | Screenshots (the Nov 26 list) | No | Phone photos of a whiteboard too? The AI can read images, but each one sent costs more than text |
+| PNG, `.png` | Supplemental | Screenshots (the Nov 26 list) | No | As `.jpg` |
+| SVG, `.svg` | Supplemental | The Nov 26 list | No | An SVG can carry scripts: only ever show it as a picture (`<img>`), never put it into the page |
+| Code: `.java`, `.py`, `.js`, ... | Supplemental | Example code (the Nov 26 list) | No | Text, so reading is easy; open: highlighting, which languages, line numbers in questions ("what does line 12 print?") |
 
 **Future ideas**
 

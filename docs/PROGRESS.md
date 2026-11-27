@@ -152,6 +152,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 26 (#145):** Docs only. Nathan and Matt's starting list of file types is in DESIGN.md's "File types to
+  support": main information (Google Slides, Google Docs, `.docx`, `.pptx`, `.pdf`, `.txt`, `.md`) and supplemental
+  information (`.jpg`, `.png`, `.svg`, code files), each with what works today and its open questions. Not a commitment
+  to build every one; no solutions chosen.
 - **Nov 26 (#143):** Animating the site begins (Matt). The nav bar's green pill is now one element behind the three
   buttons. It slides (0.3 s) to the button under the mouse and back when the mouse leaves, to a focused or pressed
   button, and to the new page. The button under it turns dark grey, and a press shrinks it a little. Hover counts
