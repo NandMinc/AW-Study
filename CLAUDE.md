@@ -114,7 +114,7 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
   `MathText` (quiz text with LaTeX between `\(` `\)` or `\[` `\]`, drawn by KaTeX with `trust: false`; never
   `renderToString` into HTML, whose inline styles the CSP blocks; fonts must not be inlined).
   `page-motion.ts` (#149: which way a new screen slides in; App keys the screen's wrapper by `pageKey`; browser tests run with
-  reduced motion unless they test motion). `GettingStarted` and `getting-started.ts` (#136: the first-run tour and the Getting started checklist on Tasks;
+  reduced motion unless they test motion). `tick-memory.ts` (#153: which ticks on Tasks are new, so they draw in; memory only, per study day). `GettingStarted` and `getting-started.ts` (#136: the first-run tour and the Getting started checklist on Tasks;
   every browser test starts past them, `playwright.config.ts`). `AfterClass` and `after-class.ts` (#129: the popup when Honed opens after a lecture, linking to "What was
   covered?"; Later is kept in localStorage). `update.ts` (when a new version may reload the page: only when locked and idle; never mid-unlock or
   while unlocked, where a banner offers Reload and Lock applies it).

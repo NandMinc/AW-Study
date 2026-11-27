@@ -4,7 +4,7 @@
 // are shown (the daily minutes are in Settings). Nothing today: the penguin. A new user also gets the
 // first-run tour and Getting started (#136). Exam practice (#87) is a
 // row of its own above the classes, on the 2 days before an exam.
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { APP_NAME } from '../brand';
 import { daysBetween } from '../plan/planner';
 import { STATUS_TEXT, type ClassTasks, type TaskItem } from '../plan/tasks';
@@ -13,6 +13,7 @@ import { GettingStarted } from './GettingStarted';
 import { Penguin } from './Penguin';
 import { loadPlanning, type ItemPlace } from './planning';
 import { href } from './route';
+import { tickMemory } from './tick-memory';
 import { useStore } from './store-context';
 import { messageOf, useLoad } from './useLoad';
 
@@ -33,6 +34,8 @@ export function TasksScreen({ tour = false }: { tour?: boolean }) {
     latest.current = data.tasks.classes.map((c) => c.courseId);
     setOrder(latest.current);
   }, [data]);
+  // Ticks done since this page was last shown draw themselves in (#153); worked out once per load
+  const fresh = useMemo(() => (data ? tickMemory.fresh(data.today, doneIds(data)) : new Set<string>()), [data]);
 
   if (error) return <p className="error">{error}</p>;
   if (!data) return null;
@@ -109,7 +112,7 @@ export function TasksScreen({ tour = false }: { tour?: boolean }) {
             <a href={href({ name: 'practice', examId: p.exam.id })}>
               Practice for {p.course.name}’s {p.exam.title} ({days === 1 ? 'tomorrow' : `in ${days} days`})
             </a>
-            {p.done && <Tick label="Practice done" />}
+            {p.done && <Tick label="Practice done" fresh={fresh.has(`practice:${p.exam.id}`)} />}
           </li>
         );
       })}
@@ -202,14 +205,14 @@ export function TasksScreen({ tour = false }: { tour?: boolean }) {
                         </span>
                       </span>
                       <span className="task-status" data-testid="task-status">
-                        {c.status === 'done' ? <Tick label="Done" /> : STATUS_TEXT[c.status]}
+                        {c.status === 'done' ? <Tick label="Done" fresh={fresh.has(`class:${c.courseId}`)} /> : STATUS_TEXT[c.status]}
                       </span>
                     </button>
                   </div>
                   {isOpen && (
                     <ul className="task-lectures">
                       {c.items.map((t) => (
-                        <LectureRow key={`${t.item.kind}-${t.item.sectionId}`} task={t} place={place(t.item.sectionId)!} />
+                        <LectureRow key={itemId(t)} task={t} place={place(t.item.sectionId)!} fresh={fresh.has(itemId(t))} />
                       ))}
                     </ul>
                   )}
@@ -224,14 +227,14 @@ export function TasksScreen({ tour = false }: { tour?: boolean }) {
 }
 
 /** One lecture today: its name opens its slides, Quiz starts its quiz (a tick once done). */
-function LectureRow({ task, place }: { task: TaskItem; place: ItemPlace }) {
+function LectureRow({ task, place, fresh }: { task: TaskItem; place: ItemPlace; fresh: boolean }) {
   const { course, section, deck, lecture } = place;
   const slides = href({ name: 'slides', courseId: course.id, deckId: deck.id, first: section.firstPage, last: section.lastPage });
   return (
     <li className="task-lecture" data-testid="task-lecture">
       <a href={slides}>{lectureName(lecture.date)}</a>
       {task.done ? (
-        <Tick label={task.item.kind === 'extra' ? 'Extra study done' : 'Quiz done'} />
+        <Tick label={task.item.kind === 'extra' ? 'Extra study done' : 'Quiz done'} fresh={fresh} />
       ) : task.item.kind === 'extra' ? (
         <span className="muted">Extra study</span>
       ) : (
@@ -241,10 +244,21 @@ function LectureRow({ task, place }: { task: TaskItem; place: ItemPlace }) {
   );
 }
 
-function Tick({ label }: { label: string }) {
+const itemId = (t: TaskItem) => `${t.item.kind}-${t.item.sectionId}`;
+
+/** Every tick on the page today, by id: each lecture's item, each class, each exam's practice. */
+function doneIds(data: { tasks: { classes: ClassTasks[] }; practice: { exam: Exam; done: boolean }[] }): string[] {
+  return [
+    ...data.tasks.classes.flatMap((c) => [...c.items.filter((t) => t.done).map(itemId), ...(c.status === 'done' ? [`class:${c.courseId}`] : [])]),
+    ...data.practice.filter((p) => p.done).map((p) => `practice:${p.exam.id}`),
+  ];
+}
+
+/** `fresh`: done since the page was last shown, so it draws itself in (#153). */
+function Tick({ label, fresh = false }: { label: string; fresh?: boolean }) {
   return (
-    <svg className="tick" viewBox="0 0 20 20" role="img" aria-label={label}>
-      <path d="M4 10.5l4 4 8-9" />
+    <svg className={fresh ? 'tick tick-new' : 'tick'} viewBox="0 0 20 20" role="img" aria-label={label}>
+      <path d="M4 10.5l4 4 8-9" pathLength={1} />
     </svg>
   );
 }

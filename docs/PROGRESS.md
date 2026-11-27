@@ -71,6 +71,7 @@ slides" and "M6: AI helper and quizzes":
 | Animate the site, step 1: the nav bar's pill slides, buttons fill in on hover and press | #143 | Matt's Claude | `NavBar.tsx` (the pill, `data-at`), the nav bar styles in `src/app.css`, the pill tests in `tests/browsers/look.spec.ts`, the nav bar part of `docs/design/README.md` | **Done** (PR #144). Later steps get their own issues |
 | Nav bar: hover rings the icon, the pill moves only with the page | #147 | Matt's Claude | the nav bar styles in `src/app.css`, the pill tests in `tests/browsers/look.spec.ts`, the nav bar part of `docs/design/README.md` | **Done** (PR #148) |
 | Animate the site, step 2: page transitions | #149 | Matt's Claude | new `src/ui/page-motion.ts` (+ test), the screen's wrapper and `usePageMotion` in `src/App.tsx`, the page transition styles in `src/app.css`, reduced motion by default in `playwright.config.ts`, `tests/browsers/motion.spec.ts`, the motion part of `docs/design/README.md` | **Done** (PR #150) |
+| Animate the site, step 3: ticking off a task | #153 | Matt's Claude | new `src/ui/tick-memory.ts` (+ test), `fresh` on `Tick` in `src/ui/TasksScreen.tsx`, the tick styles in `src/app.css`, the tick tests in `tests/browsers/motion.spec.ts`, the Tasks part of `docs/design/README.md` | **Done** (PR #154) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 
 ## Milestones
@@ -153,6 +154,12 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 26 (#153):** Ticking off a task. Back on Tasks after a quiz, each tick done since the page was last shown (a
+  lecture's Quiz done, a class's Done, Practice done) draws its stroke in with a small pop (`pathLength="1"` and
+  `stroke-dashoffset`, 0.45 s). `src/ui/tick-memory.ts` remembers which ticks were seen, in memory only, per study
+  day. The first look after the app opens, or at a new day's start, seeds it, so nothing draws then. Seen ticks stay
+  still, and with reduced motion nothing moves. 9 deliberate breaks, all caught.
 
 - **Nov 26 (#149):** Page transitions. A new screen slides in 1.5rem and fades in over 0.24 s, from the side it comes
   from (`src/ui/page-motion.ts`). Between Tasks, Classes and Settings it follows the nav bar's order. Going deeper (a
