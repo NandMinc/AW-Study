@@ -253,3 +253,45 @@ test('before an exam its class comes first, even past the daily minutes, and the
   await expect(page.getByTestId('exam-note')).toHaveText('More than your daily time today, to get you ready for PHYS 150’s Midterm 1 (in 5 days).');
   expect(await problems()).toEqual([]);
 });
+
+test('a quiz whose questions are being written in the background looks greyed out and says when it’ll be ready (#177)', async ({ page }) => {
+  const problems = await watchProblems(page);
+  await openUnlocked(page);
+  await lectureYesterday(page, 'CHEM 101');
+  // The background round sent the section to the AI helper (as WorkRunner does): its job is in this device's work state
+  const ids = await page.evaluate(
+    () =>
+      new Promise<{ course: string; section: string; deck: string }>((resolve, reject) => {
+        const open = indexedDB.open('honed');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const tx = db.transaction(['courses', 'sections', 'slideDecks', 'meta'], 'readwrite');
+          const keys = (store: string) => new Promise<string[]>((ok) => (tx.objectStore(store).getAllKeys().onsuccess = (e) => ok((e.target as IDBRequest).result as string[])));
+          void Promise.all([keys('courses'), keys('sections'), keys('slideDecks')]).then(([[course], [section], [deck]]) => {
+            const job = { sectionId: section, deckId: deck, pages: [2, 3, 4], sentAt: '2026-11-18T17:00:00.000Z', neededBy: '2026-11-19T12:00:00.000Z' };
+            tx.objectStore('meta').put({ key: 'work', value: { sent: { 'w-test': job }, problem: null, lastRound: null } });
+            tx.oncomplete = () => resolve({ course: course!, section: section!, deck: deck! });
+          });
+        };
+      }),
+  );
+  await reloadUnlocked(page);
+  const chem = classNamed(page, 'CHEM 101');
+  await chem.getByTestId('task-status').click();
+  // Greyed out, but a tap still answers
+  const quiz = chem.getByRole('button', { name: 'Quiz' });
+  await expect(quiz).toHaveAttribute('aria-disabled', 'true');
+  await quiz.click({ force: true }); // Playwright waits forever on aria-disabled; a person can still tap it
+  const dialog = page.getByRole('dialog', { name: 'Your quiz is still being written' });
+  await expect(dialog).toContainText(/Questions for slides 2–4 will be ready for your next study session \(Thursday, 4:00\s?AM\)\./);
+  await expect(dialog.getByRole('link', { name: 'Study the pages now' })).toHaveAttribute('href', `#/class/${ids.course}/slides/${ids.deck}/2-4`);
+  await dialog.getByRole('button', { name: 'OK' }).click();
+  await expect(dialog).toHaveCount(0);
+
+  // The Quiz page says the same instead of making the questions a second time
+  await page.evaluate((h) => (location.hash = h), `#/class/${ids.course}/quiz/${ids.section}`);
+  await expect(page.getByTestId('quiz-waiting')).toContainText('Your quiz is still being written');
+  await expect(page.getByRole('button', { name: 'Make questions' })).toHaveCount(0);
+  expect(await problems()).toEqual([]);
+});

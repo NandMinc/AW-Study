@@ -497,6 +497,10 @@ With no study session planned, the second line says "…will be ready within a d
 questions are being written straight away: "Almost ready: your questions are being written now." The button turns
 normal as soon as the questions arrive.
 
+**Built (#177):** `src/reading/pending.ts` and `src/ui/QuizWaiting.tsx`, on the Tasks page and the Quiz page (which
+shows the message instead of Make questions). "Being written": this device sent the section, the helper hasn't given up,
+and the bank is still empty. "Almost ready" from 2 hours before "needed by" (the helper's margin).
+
 **Batches before there's an API account** (Nathan, Nov 26). Until Honed has users besides Matt and Nathan, there's no
 API account: the helper **simulates batches** on our subscriptions with Claude Code. It keeps the same queue, rounds,
 deadlines, fingerprints and results keys, and runs each "batch" itself after a set delay (configurable, so tests can make
