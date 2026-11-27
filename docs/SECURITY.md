@@ -17,12 +17,17 @@ cryptography.**
 - **Sync** (#105, #108, opt-in in Settings): classes, lectures, quizzes, notes, settings and slide PDFs travel
   between a person's devices sealed with their data key; the server holds them but can't open them (unless that
   person turned on Google unlock). A deck's PDF comes down only when a device opens it.
+- **AI work in the background** (#161, designed, not built): the covered pages a device sends wait sealed with a key
+  only the AI helper has, and each result is sealed to the account's own results key, which only an unlocked
+  device can open. Pages are matched by fingerprints keyed per account, so the server can't tell which textbook
+  pages anyone studies.
 
 ## What it protects against, and what it doesn't
 
 | Threat | Protected? | How |
 | --- | --- | --- |
-| Our server, or anyone who takes it over, reading your classes and slides | **Yes**, at rest | The server stores none of them. The one exception is AI requests (below): a section's slide text passes through the AI helper on its way to Anthropic, and nothing is kept. With sync (v2, "Accounts and sync") it stores only ciphertext it has no key for. |
+| Our server, or anyone who takes it over, reading your classes and slides | **Yes**, at rest | The server stores none of them. The one exception is AI requests (below): a section's slide text passes through the AI helper on its way to Anthropic, and nothing is kept. With sync (v2, "Accounts and sync") it stores only ciphertext it has no key for. AI work done in the background (#161) waits sealed with a key only the helper has, and its results are sealed to the student's own key ("AI work in the background"). |
+| Our server, or anyone who takes it over, reading pages while AI works on them | **No** | To read a page's pictures or write its questions, the helper (and Anthropic) must see it. It's kept no longer than the work takes (7 days at most for background work), and only the pages a student says were covered are sent, never a whole file. |
 | Google, or someone who takes over the Google account, opening the data | **Yes**, unless that person turned on Google unlock | Signing in only says which account it is ("Accounts and sync"). With Google unlock on, a Google sign-in plus our server's key opens it ("Google unlock"). |
 | Someone who steals a session cookie | Partly | A session can't unlock anything by itself. With Google unlock on, it can fetch the key only within 5 minutes of a Google sign-in, and each fetch is recorded and shown in Settings. Sessions end after 30 days unused. |
 | The sync server withholding or rolling back changes (v2) | **No** (it can't read, forge or alter them) | Every device keeps its own full copy, so sync stops; nothing is lost from a device. |
@@ -153,6 +158,9 @@ AI is the one time data leaves the device. Everything else in this document is a
   notes about the exam, the text of its materials (outlines, past exams; never the files) and a sample
   of its lectures' slide text, cut to fit (`src/ai/style.ts`), with the guide as it stands. Nothing is
   sent unless the user asks for that job ("Make questions").
+  **Designed (#151, #161):** reading a page's pictures sends that page drawn as an image (about 1,200 px) with its
+  text; with an account, the covered pages are sent when the student says what a lecture covered, and the work
+  happens in the background ("AI work in the background").
 - **Where to:** `/ai/` on our own site only (`connect-src 'self'`), over HTTPS. Cloudflare (its edge
   and Access) and the tunnel carry it to the helper on Nathan's server (`helper/`), which sends it
   to Anthropic through Claude Code, on the asking person's own subscription.
@@ -415,6 +423,71 @@ holds.**
   planned yet. Settings says so.
 - **The keyring rule becomes:** at least one way to unlock (passphrase, passkey, or Google unlock) and
   always a recovery key, so losing the Google account never means losing the data.
+
+### AI work in the background: the results key (#161, designed Nov 26, not built)
+
+The batch flow ("Reading pictures and choosing models" in `docs/DESIGN.md`, #151) does AI work while no device is
+open: reading a section's pictures and writing its questions. A device sends the covered pages when the student
+says what was covered, and the results come back later. This section is how that keeps today's promise: **the
+server never keeps anything it can read**. It applies only to signed-in accounts; without an account the app keeps
+asking for AI work while it's open, as today.
+
+**The results key pair** (one per account, made once, never replaced):
+
+- **ECDH on P-256** (`crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' })`), made on the first unlocked
+  device that needs it. P-256 rather than X25519 because every browser Honed supports has it in WebCrypto.
+- The **public key** goes to the sync server as it is (raw, 65 bytes). Anyone may know it: it can only lock things.
+- The **private key** never leaves a device unsealed. It's exported once (`pkcs8`), sealed with the **data key**
+  like a record (AES-GCM, additional data `honed:v1:results-key`), together with the account's **fingerprint key**
+  (below), and that sealed bundle goes to the server beside the public key. A device unseals it after unlocking and
+  keeps the private key non-extractable. So whoever can unlock Honed can open results, and nobody else.
+- **Never replaced:** the server stores the public key and the sealed bundle once and refuses any other, as it does
+  for the key check ("The keyring on the server"). So a stolen session can't swap in a key someone else holds to
+  read future results. Every device also checks, after unlocking, that the sealed private key belongs to the public
+  key the server gives out, and if not refuses to send any work and says so. Two devices making one at the same
+  time: the first upload wins and the other device takes it.
+
+**A result** is sealed to the account's public key by the AI helper, the moment it's finished, with standard
+building blocks only (the ECIES pattern; WebCrypto has no HPKE yet):
+
+- A fresh **ephemeral** P-256 key pair for each result; ECDH with the account's public key gives a shared secret;
+  **HKDF-SHA-256** (salt: the ephemeral public key then the account's public key, raw; info `honed:v1:result`)
+  makes an AES-256-GCM key; **AES-GCM** with a random 96-bit IV and additional data
+  `honed:v1:result:<account id>:<result id>`, so a result can't be moved to another account or another result's
+  place. The ephemeral private key is thrown away at once.
+- On the wire and at rest: `{ v: 1, epk, iv, ct }`. The helper uses Node's own WebCrypto, the same calls as the
+  browser.
+- A signed-in device fetches its account's results, opens them with the private key, stores them **sealed with the
+  data key** like every other record (so they sync between devices as records do) and then tells the server, which
+  **deletes** its copy. Results not fetched within 30 days are deleted anyway (the work is redone if it's still
+  needed).
+
+**Keyed fingerprints.** Pages are known by their fingerprint (`src/reading/`: a SHA-256 of the page's text and of
+its drawing). A plain hash of a textbook page's text could be matched against the textbook by anyone holding it,
+which would tell the server which pages a student studies. So a device never sends a fingerprint as it is, but
+**HMAC-SHA-256** of it, with the account's **fingerprint key**: 256 random bits made with the results key pair and
+sealed in the same bundle. The server can match a page within an account (not twice the work), never between
+accounts, and can't look a page up.
+
+**The queue at rest.** Waiting pages (their pictures and text) have to be readable by the AI helper when their batch
+runs, so they can't be sealed to the student. They're sealed with a **queue key** (AES-256-GCM) that only the helper
+has, kept where the server's snapshots and backups don't reach (a dataset left out of the snapshot and replication
+tasks, set up by Nathan), so snapshots and backups hold only ciphertext. If that can't be arranged, the key lives
+only in the helper's memory: a restart then drops the waiting work, which is done again when it's next needed (the
+"needed by" deadline, or the student opening a study session).
+They're **deleted** as soon as their work is done (or given up after retries), and the queue keeps nothing longer
+than 7 days. This protects against a copied disk or backup, **not** against someone who takes the server over while
+pages wait: like every AI request today, the server sees the pages while it works on them.
+
+**What the server can see**, in addition to "What the sync server holds":
+
+| Held | Readable by the server | Sealed |
+| --- | --- | --- |
+| Results key | the public key | the private key and the fingerprint key (with the data key) |
+| Queued work (until done, 7 days at most) | the account, the job (read pictures, write questions), its keyed fingerprints, the "needed by" time, sizes, the model used | the pages' pictures and text (with the queue key, which the helper has) |
+| Results (until fetched, 30 days at most) | the account, the result id, its keyed fingerprint, sizes, when it was made | the result (with the account's public key: the server can't open it) |
+
+**For people with Google unlock on**, as before: the server could unlock their data key, and so their results key.
 
 ### Turning sync off
 
