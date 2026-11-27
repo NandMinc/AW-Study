@@ -117,6 +117,7 @@ sessions and settings:
 | studySessions (#47) | id, courseId, sectionId | which session (first week or extra), when, minutes spent |
 | settings (#47) | id (`study`) | the daily study minutes, the Tasks page's class order (#72) |
 | annotations (#56) | id, courseId, deckId | the page, the kind, where it is on the page, the words highlighted, the colour, the note, dates |
+| pageReadings (#168) | id (`reading-<deck>-<page>`, so the page number is readable), courseId, deckId | what the AI read: the words in pictures, each figure's description, the kinds of content, the page's fingerprint, which model read it, when |
 | materials (#120) | id, courseId | a class document's title, file name, kind (outline, past exam...), file type, page count, size, dates |
 | materialFiles (#120) | id (the material's) | the whole file |
 | materialPages (#120) | id (the material's) | its text, per page |

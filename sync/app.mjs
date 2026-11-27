@@ -49,8 +49,8 @@ export const MAX_KEYRING_BYTES = 64 * 1024;
 export const MAX_FILE_BYTES = 110 * 1024 * 1024; // a sealed 100 MB PDF (Honed's limit, and Cloudflare's upload limit) and a little
 export const MAX_ACCOUNT_FILE_BYTES = 5 * 1024 * 1024 * 1024; // in the testing phase
 const FILE_PATH = /^\/api\/files\/([\w-]{1,64})\/(pdf|pages)$/;
-// material and examStyle: #120 (a class's other documents and its exam style)
-const ENTITIES = new Set(['course', 'exam', 'slideDeck', 'lecture', 'section', 'question', 'quizAttempt', 'studySession', 'settings', 'annotation', 'material', 'examStyle']);
+// material and examStyle: #120 (a class's other documents and its exam style); pageReading: #168 (what the AI read on a page)
+const ENTITIES = new Set(['course', 'exam', 'slideDeck', 'lecture', 'section', 'question', 'quizAttempt', 'studySession', 'settings', 'annotation', 'material', 'examStyle', 'pageReading']);
 const ID = /^[\w-]{1,64}$/;
 const B64URL = /^[\w-]*$/;
 const TOUCH_EVERY_MS = 3_600_000; // a session's "last used" is saved at most hourly
