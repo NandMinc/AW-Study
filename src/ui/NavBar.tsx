@@ -1,8 +1,8 @@
 // The bar at the bottom of the three main pages (docs/design/README.md, "Nav bar"): Tasks (a house),
 // Classes (a stack of books) and Settings (a gear). The current page's icon sits on a filled green
 // pill. Full-screen screens (a class, the slides, a quiz, Play) don't show it: they have a back link.
-// The pill is one element behind the buttons (#143): it slides to a button that's hovered or pressed and
-// to the new page, so the bar must stay the same element between the three pages (it does, in App.tsx).
+// The pill is one element behind the buttons (#143): it slides to the new page when one is clicked, so the
+// bar must stay the same element between the three pages (it does, in App.tsx). Hover rings an icon (#147).
 import type { JSX } from 'react';
 import { href, type Route } from './route';
 

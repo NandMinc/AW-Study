@@ -127,8 +127,8 @@ test('the browser’s own controls follow the look: file pickers in our font, gr
   expect(await checkbox.evaluate((el) => getComputedStyle(el).accentColor)).toBe('rgb(159, 232, 112)'); // #9fe870
 });
 
-// The nav bar's pill slides (#143): one element behind the buttons, under the current page, moving to a hovered
-// button (only with a mouse) and back, and to the new page when one is pressed; no movement with reduced motion.
+// The nav bar's pill slides (#143): one element behind the buttons, under the current page, sliding to the new page
+// when one is pressed; hover only rings an icon (#147, with a mouse); no movement with reduced motion.
 test.describe('the nav bar pill slides', () => {
   const ACCENT_DARK = 'rgb(159, 232, 112)'; // --accent in dark, #9fe870
   /** How far the pill's middle is from a button's middle, in pixels (0 once it has slid there). */
@@ -160,22 +160,24 @@ test.describe('the nav bar pill slides', () => {
     await expect.poll(() => offset(page, 'Settings')).toBe(0);
   });
 
-  test('a hovered button fills in, and the pill comes back when the mouse leaves; not on a phone', async ({ page }, info) => {
+  test('hovering rings an icon in green but leaves the pill on your page; not on a phone (#147)', async ({ page }, info) => {
+    const ring = (label: string) => navBar(page).getByRole('link', { name: label }).evaluate((a) => getComputedStyle(a).boxShadow);
     await expect.poll(() => offset(page, 'Tasks')).toBe(0);
     await navBar(page).getByRole('link', { name: 'Settings' }).hover();
     if (info.project.name === 'desktop') {
-      await expect.poll(() => offset(page, 'Settings')).toBe(0);
-      await expect.poll(() => colour(page, 'Settings')).toBe(GREY);
-      await expect.poll(() => colour(page, 'Tasks')).toBe(ACCENT_DARK);
-      await page.mouse.move(5, 5);
-      await expect.poll(() => offset(page, 'Tasks')).toBe(0);
-      await expect.poll(() => colour(page, 'Tasks')).toBe(GREY);
+      await expect.poll(() => ring('Settings')).toContain(ACCENT_DARK);
     } else {
-      // A tap leaves a phone "hovering": the pill must not stay on a page you didn't open
-      await page.waitForTimeout(400);
-      expect(await offset(page, 'Tasks')).toBe(0);
-      expect(await colour(page, 'Settings')).toBe(ACCENT_DARK);
+      await page.waitForTimeout(400); // a tap leaves a phone "hovering": no ring left behind
+      expect(await ring('Settings')).toBe('none');
     }
+    await page.waitForTimeout(400); // longer than the slide: the pill hasn't moved
+    expect(await offset(page, 'Tasks')).toBe(0);
+    expect(await colour(page, 'Tasks')).toBe(GREY);
+    expect(await colour(page, 'Settings')).toBe(ACCENT_DARK);
+    // Your own page gets no ring
+    await navBar(page).getByRole('link', { name: 'Tasks' }).hover();
+    await page.waitForTimeout(250);
+    expect(await ring('Tasks')).toBe('none');
   });
 
   test('with reduced motion it moves at once', async ({ page }) => {
