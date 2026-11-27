@@ -202,6 +202,11 @@ function keepStandalone(questions, textsOf) {
   return kept;
 }
 
+// Slides that teach nothing of their own, so no question is asked about them (#158: summary and recap slides too,
+// whose questions repeat ones asked on the slides where those ideas are taught). Shared by both question jobs.
+const SKIP_SLIDES =
+  'Never ask about slides that only organise the lecture or repeat it: title, agenda or contents, learning objectives, section dividers, summary, recap or "what we learned", "thank you", "questions?", references or credits.';
+
 // --- Levels and the exam style guide (#121) ---
 
 // DESIGN "Levels": three, because the AI can tell them apart reliably
@@ -249,10 +254,13 @@ export const JOBS = {
           LEVELS,
           ...(input.guide ? [GUIDE] : []),
           'A multiple-choice question has exactly 4 different options and exactly one right answer. Wrong options must be plausible; for a worked problem, make them the answers common mistakes give.',
+          // #158: on one lecture the right option was the longest in half the questions
+          'Make the wrong options as long and as detailed as the right one, so its length or detail never gives it away: the right option must not be the longest more often than the others.',
           ...(short > 0
             ? ['A short-answer question asks for an answer of at most two sentences, preferably one. It has no options: list 1 to 3 points a full answer makes, short and checkable (a marker gives one mark per point), and give a one-sentence model answer as its explanation.']
             : []),
-          'Each question is based on one slide: give that slide\'s number as "page" (the app uses it to show where to revise). Spread the questions over the slides that have something to learn, giving more to slides with more to learn. Never ask about slides that only organise the lecture: title, agenda or contents, section dividers, "thank you", "questions?", references or credits; put those questions on the other slides instead.',
+          'Each question is based on one slide: give that slide\'s number as "page" (the app uses it to show where to revise). Spread the questions over the slides that have something to learn, giving more to slides with more to learn.',
+          `${SKIP_SLIDES.slice(0, -1)}; put those questions on the other slides instead.`,
           'Don\'t repeat or closely rephrase any question in DATA.avoid.',
           short > 0
             ? 'Reply with: {"questions": [either {"form": "choice", "level": 1, 2 or 3, "question": string, "options": [4 strings], "answer": index of the right option (0-3), "page": slide number, "explanation": one sentence on why it\'s right} or {"form": "short", "level": 3, "question": string, "points": [1 to 3 strings], "page": slide number, "explanation": a one-sentence model answer}]}'
@@ -310,7 +318,8 @@ export const JOBS = {
           `Write ${input.count} short-answer exam questions on the slides in DATA.pages (each has a slide number "page" and its "text"). Each should take a student 2 to 4 sentences to answer.`,
           STANDALONE,
           `For each, list 2 to ${LIMITS.writtenPoints} points a full answer makes, short and checkable; a marker gives one mark per point.`,
-          'Each question is based on one slide: give that slide\'s number as "page". Choose the slides with the most important ideas. Never ask about slides that only organise the lecture: title, agenda or contents, section dividers, "thank you", "questions?", references or credits.',
+          'Each question is based on one slide: give that slide\'s number as "page". Choose the slides with the most important ideas.',
+          SKIP_SLIDES,
           'Reply with: {"questions": [{"question": string, "points": [strings], "page": slide number}]}',
         ].join('\n'),
         input,
