@@ -31,11 +31,12 @@ import { planMethods } from './plan';
 import { quizMethods } from './quiz';
 import { styleMethods } from './style';
 import { syncMethods, type SyncState, type WireChange } from './sync';
+import { workMethods, type WorkStore } from './work';
 import { DB_VERSION, openHonedDb, RECORD_STORES, type ChangeRecord, type HonedDb, type RecordStore } from './schema';
 
 export type StoreStatus = 'new' | 'locked' | 'unlocked';
 
-export interface StudyStore extends LectureStore, QuizStore, PlanStore, AnnotationStore, ExamStyleStore, ReadingStore {
+export interface StudyStore extends LectureStore, QuizStore, PlanStore, AnnotationStore, ExamStyleStore, ReadingStore, WorkStore {
   deviceId(): string;
 
   // --- The lock side (the screens' `Vault`, src/ui/vault.ts) ---
@@ -518,6 +519,8 @@ function makeStore(db: HonedDb, device: string, deps: StoreDeps, keyringSaved: b
 
     // --- Sync (#105): src/db/sync.ts ---
     ...syncPart,
+    // AI work in the background (#168): the results key and job notes, with the data key that never leaves here
+    ...workMethods({ db, key: () => key }),
 
     setFileSource(source) {
       fileSource = source;

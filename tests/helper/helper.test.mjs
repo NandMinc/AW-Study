@@ -845,7 +845,7 @@ describe('AI work in the background (#166)', () => {
     expect(results).toHaveLength(1);
     const r = results[0];
     const sealed = { v: 1, epk: new Uint8Array(Buffer.from(r.sealed.epk, 'base64url')), iv: new Uint8Array(Buffer.from(r.sealed.iv, 'base64url')), ct: new Uint8Array(Buffer.from(r.sealed.ct, 'base64url')) };
-    expect(JSON.parse(new TextDecoder().decode(await openResult(key, r.accountId, r.id, sealed)))).toEqual({ pages: [51, 52] });
+    expect(JSON.parse(new TextDecoder().decode(await openResult(key, r.accountId, r.id, sealed)))).toEqual({ note: null, result: { pages: [51, 52] } });
     expect((await (await call('results', { email: 'nathan@example.com' })).json()).results).toEqual([]);
     expect(await (await call('results/confirm', { method: 'POST', body: { ids: ['sec-1'] } })).json()).toEqual({ deleted: 1 });
     expect((await (await call('results')).json()).results).toEqual([]);

@@ -62,7 +62,12 @@ async function at(ms, q) {
 
 async function opened(q, person, id) {
   const r = q.resultsFor(person).find((x) => x.id === id);
-  return JSON.parse(new TextDecoder().decode(await openResult(key, r.accountId, r.id, r.sealed)));
+  return JSON.parse(new TextDecoder().decode(await openResult(key, r.accountId, r.id, r.sealed))).result;
+}
+
+async function openedNote(q, person, id) {
+  const r = q.resultsFor(person).find((x) => x.id === id);
+  return JSON.parse(new TextDecoder().decode(await openResult(key, r.accountId, r.id, r.sealed))).note;
 }
 
 describe('the queue', () => {
@@ -157,6 +162,15 @@ describe('the queue', () => {
     for (const h of [1, 2, 3, 4]) await at(T0 + h * HOUR, q2);
     expect(q2.get('nathan', 'k')).toMatchObject({ state: 'failed', error: 'The read round failed 3 times.' });
     expect(q2.resultsFor('nathan')).toEqual([]);
+  });
+
+  it('gives the device’s note back inside the sealed result, untouched', async () => {
+    const q = queue({ rounds: rounds(['read']) });
+    q.submit('nathan', { ...work('j'), note: 'c2VhbGVkLWJ5LXRoZS1kZXZpY2U' });
+    q.submit('nathan', work('k', 1, { from: 9 }));
+    await at(T0 + HOUR, q);
+    expect(await openedNote(q, 'nathan', 'j')).toBe('c2VhbGVkLWJ5LXRoZS1kZXZpY2U');
+    expect(await openedNote(q, 'nathan', 'k')).toBeNull();
   });
 
   it('finishes early when a round says so', async () => {
@@ -255,6 +269,8 @@ describe('validateWork', () => {
     ['the same page twice', (b) => (b.pages[1].page = 51)],
     ['text too long', (b) => (b.pages[0].text = 'x'.repeat(QUEUE.maxText + 1))],
     ['no page number', (b) => delete b.pages[0].page],
+    ['a note not in base64url', (b) => (b.note = 'not base64url!')],
+    ['a note too long', (b) => (b.note = 'A'.repeat(QUEUE.maxNote + 1))],
   ])('refuses %s', (_name, change) => {
     const b = body();
     change(b);

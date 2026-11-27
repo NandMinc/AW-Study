@@ -475,6 +475,17 @@ OCR would fix the first file but not the second (it can't make sense of a struct
 11. **Failures are retried** (an errored or expired request goes in the next batch; a page the AI refuses to read falls
     back to its text). The student never sees them; Matt and Nathan get a list (in the helper's log or an admin view).
 
+**Built (#168, 5c: `src/reading/work.ts`, `WorkRunner`):** the app's side runs as a background round every 3 minutes
+while Honed is unlocked and on screen (the first 15 s after unlocking), only with an account. It (1) makes the results
+key the first time; (2) files finished results as page readings and confirms them (a device without the deck leaves the
+result for one that has it; another account's results are left alone); (3) sends a job again if the helper forgot it;
+(4) sends the next section the planner wants within 14 days whose covered picture pages aren't read yet. "Needed by" is
+the start of the first study day within 14 days on which the planner's own `sectionItems` gives the section an item
+(overdue counts as today). Rather than "when the student says what was covered", the round picks sections up by
+itself, so nothing in the screens had to change and a restart or an offline moment never loses work. A section looked
+at with nothing to read isn't scanned again unless its range changes. Not built yet: the quiz button's message (step 8)
+and anything that shows or uses the readings (step 7).
+
 **A quiz that isn't ready yet** (Nathan, Nov 26). The quiz button looks greyed out, but it still answers a tap (it's
 `aria-disabled`, not `disabled`, so screen readers say it's unavailable and the tap still works). A tap opens a small box:
 

@@ -468,6 +468,12 @@ building blocks only (the ECIES pattern; WebCrypto has no HPKE yet):
   **deletes** its copy. Results not fetched within 30 days are deleted anyway (the work is redone if it's still
   needed).
 
+**A job's note** (#168): which deck, section and pages a job is, with the pages' plain fingerprints, is sealed with the
+**data key** (additional data `honed:v1:work-note:<job id>`) and sent with the job; the helper puts it back, untouched,
+inside the sealed result. So any of the student's devices can file a result, and the helper never sees deck ids next
+to plain fingerprints. **The account id** results are bound to is the first 32 hex digits of SHA-256 of the account's
+results public key: the same on every device, nothing the server didn't already have.
+
 **Keyed fingerprints.** Pages are known by their fingerprint (`src/reading/`: a SHA-256 of the page's text and of
 its drawing). A plain hash of a textbook page's text could be matched against the textbook by anyone holding it,
 which would tell the server which pages a student studies. So a device never sends a fingerprint as it is, but
