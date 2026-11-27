@@ -635,6 +635,24 @@ describe('exam style (#121)', () => {
     expect(questions).toContain('references or credits; put those questions on the other slides instead.');
   });
 
+  it('questions: a level is what answering takes, so recall is level 1 however it is phrased; plain, exact wording (#164)', async () => {
+    const written = { question: 'Why do covalent bonds form?', points: ['atoms share electrons'], page: 21 };
+    await start([reply({ questions: [choice(1)] }), reply({ questions: [written] })]);
+    await post('questions', { pages: SLIDES, count: 1 });
+    await post('written', { pages: SLIDES, count: 1 });
+    const [questions, writtenPrompt] = calls().map((c) => instructions(c.stdin));
+    expect(questions).toContain('if a student who memorised the slides could answer it without working anything out, it is level 1');
+    expect(questions).toContain('however it is phrased ("why", "what follows", "the significance of")');
+    expect(questions).toContain("Level 3 needs several steps, or reasoning the slides don't spell out.");
+    expect(questions).toContain('a definition, a name or date');
+    // Both question jobs: say exactly which part of a formula, and read each question back
+    for (const prompt of [questions, writtenPrompt]) {
+      expect(prompt).toContain('plain, exact words a student understands on the first reading');
+      expect(prompt).toContain('say exactly which part');
+      expect(prompt).toContain('Read each question back as the student would before replying');
+    }
+  });
+
   it('questions with a mix: the counts in the prompt; short ones always level 3, with 1 to 3 points; extras dropped', async () => {
     await start([reply({ questions: [short({ level: 2 }), choice(1), choice(2, 21, 2), short({ question: 'An extra short one?' }), choice(3, 22, 3)] })]);
     const body = await (await post('questions', { pages: SLIDES, count: 4, mix: MIX })).json();
