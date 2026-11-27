@@ -160,7 +160,11 @@ the "Test and publish" run on `main` to finish, then press Update.
   drawings. Design: pages sorted on the device, picture pages read once by Claude when added (Haiku first, Sonnet for about
   1 in 4, Nathan's choice), the descriptions stored encrypted with the slide text; quizzes by difficulty too (Haiku; Sonnet
   for hard pages, level 3 and questions that fail a blind check). Estimated ~$7-12 a student a month on the API (Opus
-  everywhere ~$50). First step when it's agreed: a side-by-side model test.
+  everywhere ~$50). First step when it's agreed: a side-by-side model test. **Workflow agreed by Matt and Nathan the same
+  day:** batch the reading and the questions once pages are marked covered (the device sends only those pages, with a
+  "needed by" time; two rounds, a third if time allows; anything late runs straight away); results locked to the
+  account with a results key pair; Explain on an unread page reads it at once (kept by page fingerprint); a greyed quiz
+  button that says when the quiz will be ready; batches simulated on our subscriptions until there are other users.
 - **Nov 26 (#149):** Page transitions. A new screen slides in 1.5rem and fades in over 0.24 s, from the side it comes
   from (`src/ui/page-motion.ts`). Between Tasks, Classes and Settings it follows the nav bar's order. Going deeper (a
   class, then What was covered?, the slides, a quiz, practice or Play) comes from the right, going back from the left,
