@@ -526,6 +526,10 @@ model when possible").
 - **Built (#172, 6a):** `questionRounds` in `helper/rounds.mjs`. The blind check covers Haiku's multiple choice; if
   the check itself can't be done (two unusable answers), all of that part is rewritten rather than kept unchecked.
   Rewrites are as many again, on the failed questions' group, at their levels, avoiding the failed ones.
+- **Built (#172, 6b):** the app sends a section when its bank is missing questions, not only when it has pictures to
+  read; its plan is `planBank`'s, with an unread picture page counted as an average page (150 words) since its reading
+  arrives in the same job. Banks filled while the app was open are only topped up to their levels. The Quiz page still
+  makes questions itself when a bank is empty: step 8 has it say they're being written instead.
 - **The helper chooses the model, never the student.** Settings' Compare models (#79) stays for us to test with.
 
 **Cost per student per month** (estimates, about ±50%; Nov 26 API prices per million tokens in/out: Haiku 5.5 $0.10/$0.50,

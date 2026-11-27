@@ -18,6 +18,10 @@ import { deviceTimeZone, studyDay } from '../lib/studyDay';
 import { addDays, sectionItems, type PlanInput } from '../plan/planner';
 import { DAY_START_HOUR } from '../ui/settings';
 import { openPdf } from '../viewer/pdf';
+import { planBank } from '../quiz/bank';
+import { questionKey } from '../db/quiz';
+import type { PageReading } from '../types/reading';
+import type { QuestionInput } from '../types/quiz';
 import { drawPagePng, scanPages } from './scan';
 
 export const WORK = {
@@ -36,7 +40,8 @@ export interface WorkOptions {
 }
 
 export interface WorkRound {
-  filed: number; // results saved as page readings
+  filed: number; // pages saved as page readings
+  questions: number; // questions added to banks
   sent: string | null; // the section sent this round, if any
   problem: string | null;
 }
@@ -160,18 +165,19 @@ interface ReadingOut {
 }
 
 /** Saves finished results as page readings and confirms them. Gives how many pages were filed. */
-async function fileResults(store: StudyStore, key: ResultsKey, accountId: string, state: WorkState, fetcher: Fetch): Promise<number> {
+async function fileResults(store: StudyStore, key: ResultsKey, accountId: string, state: WorkState, fetcher: Fetch): Promise<{ pages: number; questions: number }> {
   const res = await fetcher('/ai/results', { credentials: 'same-origin' });
   if (res.status === 401 || res.status === 403) throw new WorkProblem('Sign in for AI to get your slides read.');
   if (res.status === 501) throw new WorkProblem('Background AI work isn’t switched on.');
   if (!res.ok) throw new WorkProblem('Couldn’t reach the AI helper.');
   const { results } = (await res.json()) as { results: Result[] };
   let filed = 0;
+  let added = 0;
   const done: string[] = [];
   for (const r of results) {
     if (r.accountId !== accountId) continue; // another account's (a test account on the same AI sign-in): not ours to touch
     const sealed: SealedResult = { v: 1, epk: fromB64(r.sealed.epk), iv: fromB64(r.sealed.iv), ct: fromB64(r.sealed.ct) };
-    let out: { note: string | null; result: { readings?: ReadingOut[] } | null };
+    let out: { note: string | null; result: { readings?: ReadingOut[]; questions?: QuestionOut[] } | null };
     let note: WorkNote;
     try {
       out = JSON.parse(new TextDecoder().decode(await openResult(key, accountId, r.id, sealed)));
@@ -204,6 +210,22 @@ async function fileResults(store: StudyStore, key: ResultsKey, accountId: string
         // A page no longer in the deck: nothing to file it under
       }
     }
+    // The questions go into the section's bank, without repeats of what it has (or of each other)
+    if (deckHere && out.result?.questions?.length) {
+      try {
+        const seen = new Set((await store.listQuestions(note.sectionId)).map((q) => questionKey(q.question)));
+        const fresh = out.result.questions.filter((q) => {
+          const k = questionKey(q.question);
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+        if (fresh.length) added += (await store.addQuestions(note.sectionId, fresh.map(toQuestionInput))).length;
+      } catch (err) {
+        if (err instanceof StoreError && err.code === 'not-found') deckHere = false; // the section isn't here (yet)
+        else throw err;
+      }
+    }
     if (!deckHere) continue;
     done.push(r.id);
     delete state.sent[r.id];
@@ -211,8 +233,37 @@ async function fileResults(store: StudyStore, key: ResultsKey, accountId: string
   if (done.length) {
     await fetcher('/ai/results/confirm', { method: 'POST', credentials: 'same-origin', headers: json, body: JSON.stringify({ ids: done }) });
   }
-  return filed;
+  return { pages: filed, questions: added };
 }
+
+interface QuestionOut {
+  form: 'choice' | 'short';
+  level: 1 | 2 | 3;
+  question: string;
+  options?: string[];
+  answer?: number;
+  points?: string[];
+  page: number;
+  explanation?: string;
+}
+
+function toQuestionInput(q: QuestionOut): QuestionInput {
+  if (q.form === 'short') return { form: 'short', level: 3, page: q.page, question: q.question, points: q.points ?? [], explanation: q.explanation ?? '' };
+  return { form: 'choice', level: q.level, page: q.page, question: q.question, options: q.options as [string, string, string, string], answer: q.answer as 0 | 1 | 2 | 3, explanation: q.explanation ?? '' };
+}
+
+/** The page text questions are written from: its own text, then what the AI read on its pictures (as the helper adds it). */
+export function textWithReading(text: string, reading: PageReading | undefined): string {
+  if (!reading || reading.decorativeOnly) return text;
+  const parts = [text];
+  if (reading.pictureText) parts.push(`[Text in the slide's pictures]\n${reading.pictureText}`);
+  for (const f of reading.figures) parts.push(`[${f.label || 'Figure'}] ${f.description}`);
+  return parts.filter((p) => p && p.trim()).join('\n');
+}
+
+/** An unread picture page is counted as this many words when planning the bank: its reading comes in the same job. */
+export const UNREAD_PICTURE_WORDS = 150;
+const QUESTION_TEXT_MAX = 8_000; // the helper's limit on a page's text for questions
 
 /** Checks the jobs sent: forgets those done, failed (kept a day so they're not sent straight back) or unknown. */
 async function checkSent(state: WorkState, now: Date, fetcher: Fetch) {
@@ -241,24 +292,36 @@ async function sendNext(store: StudyStore, key: ResultsKey, accountId: string, s
     .filter((x): x is { section: Section; on: string } => x.on !== null && !busy.has(x.section.id))
     .sort((a, b) => a.on.localeCompare(b.on));
   for (const { section, on } of due) {
-    const checkedAs = `${section.deckId}:${section.firstPage}-${section.lastPage}`;
-    if (state.checked?.[section.id] === checkedAs) continue; // looked at already, nothing to read
+    const bank = await store.listQuestions(section.id);
+    // Looked at already with nothing to do: not again unless the range or the bank changes
+    const checkedAs = `${section.deckId}:${section.firstPage}-${section.lastPage}:${bank.length}`;
+    if (state.checked?.[section.id] === checkedAs) continue;
     const { doc, close } = await openPdf(await store.getSlideDeckFile(section.deckId));
     try {
       const pages = Array.from({ length: section.lastPage - section.firstPage + 1 }, (_, i) => section.firstPage + i);
       const scans = await scanPages(doc, pages);
       const read = new Map((await store.listPageReadings(section.deckId)).map((r) => [r.page, r]));
-      const todo = scans.filter((s) => {
+      const unread = (s: (typeof scans)[number]) => {
         if (s.sort !== 'pictures') return false;
         const had = read.get(s.page);
         return !had || had.fingerprint.text !== s.fingerprint.text || had.fingerprint.look !== s.fingerprint.look;
-      });
-      if (!todo.length) {
+      };
+      const todo = scans.filter(unread);
+      // The bank's plan (the app's own planBank, the class's guide as it stands): what it's still missing. An unread
+      // picture page counts as an average page, since its reading comes in the same job.
+      const guide = (await store.getExamStyle(section.courseId)).guide;
+      const forQuestions = new Map(scans.map((s) => [s.page, textWithReading(s.text, unread(s) ? undefined : read.get(s.page)).slice(0, QUESTION_TEXT_MAX)]));
+      const estimate = scans
+        .map((s) => ({ page: s.page, text: unread(s) ? `${forQuestions.get(s.page)} ${'word '.repeat(UNREAD_PICTURE_WORDS)}` : forQuestions.get(s.page)! }))
+        .filter((s) => s.text.trim());
+      const requests = planBank(estimate, bank, guide?.shortShare ?? 0).map((r) => ({ pages: r.pages.map((p) => p.page), count: r.count, mix: r.mix }));
+      if (!todo.length && !requests.length) {
         state.checked = { ...state.checked, [section.id]: checkedAs };
         continue;
       }
-      const note: WorkNote = { deckId: section.deckId, sectionId: section.id, pages: todo.map((s) => ({ page: s.page, ...s.fingerprint })) };
-      const id = `w-${(await sha256(JSON.stringify(note))).slice(0, 40)}`;
+      const sendPages = scans.filter((s) => unread(s) || requests.some((r) => r.pages.includes(s.page)));
+      const note: WorkNote = { deckId: section.deckId, sectionId: section.id, pages: sendPages.map((s) => ({ page: s.page, ...s.fingerprint })) };
+      const id = `w-${(await sha256(JSON.stringify({ note, requests }))).slice(0, 40)}`;
       const sealedNote = await store.sealWorkNote(id, note);
       const body = {
         id,
@@ -267,17 +330,23 @@ async function sendNext(store: StudyStore, key: ResultsKey, accountId: string, s
         neededBy: dayStarts(on),
         note: packNote(sealedNote),
         pages: await Promise.all(
-          todo.map(async (s) => ({ page: s.page, fp: await keyedFingerprint(key, s.fingerprint), text: s.text, image: b64(await drawPagePng(doc, s.page)) })),
+          sendPages.map(async (s) => ({
+            page: s.page,
+            fp: await keyedFingerprint(key, s.fingerprint),
+            text: forQuestions.get(s.page)!,
+            image: unread(s) ? b64(await drawPagePng(doc, s.page)) : null,
+          })),
         ),
+        ...(requests.length && { questions: { requests, guide: guide ?? null, avoid: bank.map((q) => q.question).slice(-200) } }),
       };
       const res = await fetcher('/ai/work', { method: 'POST', credentials: 'same-origin', headers: json, body: JSON.stringify(body) });
       if (res.status === 401 || res.status === 403) throw new WorkProblem('Sign in for AI to get your slides read.');
       if (res.status === 413) {
-        state.sent[id] = { sectionId: section.id, deckId: section.deckId, pages: todo.map((s) => s.page), sentAt: now.toISOString(), failedAt: now.toISOString() };
-        throw new WorkProblem('A section has more pictures than a day’s reading: split it into smaller sections.');
+        state.sent[id] = { sectionId: section.id, deckId: section.deckId, pages: sendPages.map((s) => s.page), sentAt: now.toISOString(), failedAt: now.toISOString() };
+        throw new WorkProblem('A section has more pages than a day’s AI work: split it into smaller sections.');
       }
       if (!res.ok) throw new WorkProblem('The AI helper couldn’t take the work right now.');
-      state.sent[id] = { sectionId: section.id, deckId: section.deckId, pages: todo.map((s) => s.page), sentAt: now.toISOString() };
+      state.sent[id] = { sectionId: section.id, deckId: section.deckId, pages: sendPages.map((s) => s.page), sentAt: now.toISOString() };
       return section.id;
     } finally {
       await close();
@@ -296,11 +365,13 @@ export async function workOnce(store: StudyStore, options: WorkOptions = {}): Pr
   const timeZone = options.timeZone ?? deviceTimeZone();
   if (!(await store.getSyncState())) return null;
   const state = await store.getWorkState();
-  const round: WorkRound = { filed: 0, sent: null, problem: null };
+  const round: WorkRound = { filed: 0, questions: 0, sent: null, problem: null };
   try {
     const key = await ensureResultsKey(store, fetcher);
     const accountId = await accountIdOf(key.publicKey);
-    round.filed = await fileResults(store, key, accountId, state, fetcher);
+    const filed = await fileResults(store, key, accountId, state, fetcher);
+    round.filed = filed.pages;
+    round.questions = filed.questions;
     await checkSent(state, now, fetcher);
     round.sent = await sendNext(store, key, accountId, state, now, timeZone, fetcher);
   } catch (err) {
