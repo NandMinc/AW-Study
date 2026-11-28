@@ -192,7 +192,10 @@ test('highlight words, box part of a slide and pin a note; they stay in place af
   await highlight.getByRole('button', { name: 'Add a note' }).click();
   await highlight.getByLabel('Note').fill('Powerhouse of the cell');
   await highlight.getByRole('button', { name: 'Save note' }).click();
-  await expect(highlight).toContainText('Powerhouse of the cell');
+  // The note's textarea holds the words too, so wait for the editor to close: until it does, the rows below jump up
+  // ~185 px when the save lands, and a tap on them misses (#180)
+  await expect(highlight.getByRole('textbox', { name: 'Note' })).toHaveCount(0);
+  await expect(highlight.locator('.ann-note')).toHaveText('Powerhouse of the cell');
   const box = again.getByTestId('annotation').filter({ hasText: 'Box' });
   await box.getByRole('button', { name: 'Delete' }).click();
   await box.getByRole('button', { name: 'Delete for good' }).click();
