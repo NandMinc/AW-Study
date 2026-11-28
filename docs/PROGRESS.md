@@ -91,6 +91,7 @@ slides" and "M6: AI helper and quizzes":
 | Nav bar and page stay put when a page has a scrollbar (Matt's bug report 8) | #184 | Nathan's Claude | `scrollbar-gutter` on `html` in `src/app.css`, new `tests/browsers/scrollbar.spec.ts` | **Done** (this PR) |
 | Tasks draws its real layout first (the iPhone practice test's missed tap) | #186 | Nathan's Claude | the class order in `src/ui/TasksScreen.tsx`, a test in `tests/browsers/practice.spec.ts` | **Done** (this PR) |
 | Faster test runs, measured step by step | #192 | Nathan's Claude | `tests/browsers/fixtures.ts` (`fastKdf`, `realKdf`), the extra contexts in `backup.spec.ts`, `sync.spec.ts`, `scrollbar.spec.ts`, `lock.spec.ts`, `playwright.config.ts` (timing report), `package.json` `test`, new `tools/run-tests.mjs`, `tools/test-timing.mjs`, the commands table in `CLAUDE.md` | **Done** (this PR) |
+| Bug button: a drag lost to a link under it (the admin site's fix, copied) | #195 | Nathan's Claude | `public/bugreport.js` | **Done** (this PR) |
 
 ## Milestones
 
@@ -173,6 +174,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 28 (#195):** `public/bugreport.js` takes the admin site's fix: a mouse press on the beetle button now calls
+  preventDefault, because with a link under it Chromium started dragging the link and cancelled the button's drag
+  after one move (found by the admin site's tests). Still byte-identical to the admin copy.
 - **Nov 27 (#192):** Faster tests, each step measured with the new `tools/test-timing.mjs` (median of 3 full runs on
   Nathan's PC, 12 browsers at once). Baseline `npm test` 119.3 s; the iPhone (WebKit) project was 69% of browser test time.
   (1) PBKDF2 at 1,000 rounds inside the test browser (`fastKdf` in `fixtures.ts`; the app and what it stores are
