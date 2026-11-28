@@ -612,6 +612,9 @@
     button.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       e.stopPropagation();
+      // No browser drag-and-drop or text selection from this press: with a link under the button (the admin
+      // menu), Chromium started dragging the link and cancelled ours after one move (Nov 28)
+      if (e.pointerType === 'mouse') e.preventDefault();
       const r = button.getBoundingClientRect();
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false };
       try { button.setPointerCapture(e.pointerId); } catch { /* old browser */ }
