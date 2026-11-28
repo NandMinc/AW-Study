@@ -84,7 +84,8 @@ slides" and "M6: AI helper and quizzes":
 | Reading pictures, step 6: questions by difficulty with the blind check (6a helper rounds, 6b app) | #172 | Nathan's Claude | 6b: `src/reading/work.ts` (the bank plan, text pages, filing questions), `src/reading/work.test.ts`; 6a: `questionRounds` in `helper/rounds.mjs`, the question plan and quick rounds in `helper/queue.mjs`, `helper/server.mjs`, `tests/helper/questions.test.mjs` | **Done**: 6a (PR #173), 6b (this PR). Live once `site-honed` updates |
 | Reading pictures, step 7: Explain, Ask and Box use the readings, a page read now | #175 | Nathan's Claude | `helper/jobs.mjs` (pictures for explain/ask, the `read` job), `readPage` in `helper/rounds.mjs`, `helper/app.mjs`; `src/ai/` (`readPage`, pictures), new `src/reading/explain.ts`, `drawAreaPng` in `src/reading/scan.ts`, `prepare` in `src/viewer/AnnotatedViewer.tsx`, `src/ui/DeckSlides.tsx` | **Done** (this PR) |
 | Reading pictures, step 8: the quiz button while questions are being written | #177 | Nathan's Claude | new `src/reading/pending.ts` (+ test), new `src/ui/QuizWaiting.tsx`, the Quiz link in `src/ui/TasksScreen.tsx`, the start part of `src/ui/QuizScreen.tsx`, `neededBy` in `src/db/work.ts`, `.link-button` in `src/app.css`, a test in `tests/browsers/play.spec.ts` | **Done** (this PR). The build plan of "Reading pictures and choosing models" is finished |
-| Settings draws once: nothing moves under a tap (the iPhone backup test timing out) | #92 | Nathan's Claude | the first-draw load in `src/ui/SettingsScreen.tsx`, `initial` in `src/ui/useLoad.ts`, `loadCompareChoices` and the `initialChoices` prop in `src/ui/AiSettings.tsx`, `initial` props on `SyncSettings`, `ThisDevice` and `BackupSettings`' Storage, new `tests/browsers/settings-stable.spec.ts` | **Done** (this PR) |
+| Settings draws once: nothing moves under a tap (the iPhone backup test timing out) | #92 | Nathan's Claude | the first-draw load in `src/ui/SettingsScreen.tsx`, `initial` in `src/ui/useLoad.ts`, `loadCompareChoices` and the `initialChoices` prop in `src/ui/AiSettings.tsx`, `initial` props on `SyncSettings`, `ThisDevice` and `BackupSettings`' Storage, new `tests/browsers/settings-stable.spec.ts` | **Done** (PR #179) |
+| The annotations test failing under load (iPhone, from #92) | #180 | Nathan's Claude | `tests/browsers/annotations.spec.ts` (one wait) | **Done** (this PR): a test problem, not the app |
 
 ## Milestones
 
@@ -166,6 +167,14 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 27 (#180):** `[iphone] annotations.spec.ts:109` reproduced under load: 3 failures in 48 runs (12 at once),
+  each a tap in the notes panel that did nothing ("Delete" opened no confirm, or "Delete for good" deleted nothing).
+  Cause, measured frame by frame: after "Save note" the test waited for the highlight's row to contain the note's
+  words, but the still-open textarea holds them too, so the test moved on while the save was in flight; when it
+  landed the editor closed, the row shrank 401 → 216 px and the page's scroll was clamped, so the Box row's buttons
+  jumped up just as they were tapped. The test now waits for the editor to close and the note to show
+  (`.ann-note`). After: 48 of 48 under the same load. The app was fine: a person sees the editor close.
 
 - **Nov 27 (#92):** The iPhone backup test that timed out under load (`backup.spec.ts`, Nov 20 and 22) was a real
   layout shift: Settings drew, then Study time, Sync, Compare models and Storage each filled in from their own loads,
@@ -767,6 +776,9 @@ the "Test and publish" run on `main` to finish, then press Update.
   everything below it down, and a tap (a test's or a person's) lands where a button was. Playwright's "stable" check
   doesn't save you: the move can come between its check and the tap, mostly when the machine is busy. Load first,
   then draw (as Settings does), or keep the space the same while loading. `settings-stable.spec.ts` shows how to test it.
+- **`toContainText` sees a textarea's words** (#180): after typing into an editor and pressing Save, "the row contains
+  the words" is already true before the save lands. Wait for the editor to go (`toHaveCount(0)` on its textbox) and
+  for the saved text in its own element.
 
 - **Browser tests run with reduced motion** (#149, `playwright.config.ts`): no page slides or pill movement, so a
   test that measures a box or a colour never catches a screen mid-slide. A test of motion turns it back on with
