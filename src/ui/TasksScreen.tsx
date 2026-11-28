@@ -26,7 +26,9 @@ export function TasksScreen({ tour = false }: { tour?: boolean }) {
   const { data, error } = useLoad(() => loadPlanning(store), [store]);
   // Sections whose questions are still being written in the background (#177): their Quiz says when it'll be ready
   const { data: writing } = useLoad(() => questionsBeingWritten(store), [store]);
-  const [order, setOrder] = useState<string[]>([]);
+  // The order as dragged here; null = the loaded one. Never an empty stand-in: the first draw must already be the
+  // real layout, or the page swaps under a tap (#186: it drew "nothing today" for a frame, then rebuilt every row)
+  const [dragged, setOrder] = useState<string[] | null>(null);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [problem, setProblem] = useState<string | null>(null);
   const [saved, setSaved] = useState('');
@@ -37,7 +39,7 @@ export function TasksScreen({ tour = false }: { tour?: boolean }) {
   useEffect(() => {
     if (!data) return;
     latest.current = data.tasks.classes.map((c) => c.courseId);
-    setOrder(latest.current);
+    setOrder(null);
   }, [data]);
   // Ticks done since this page was last shown draw themselves in (#153); worked out once per load
   const fresh = useMemo(() => (data ? tickMemory.fresh(data.today, doneIds(data)) : new Set<string>()), [data]);
@@ -46,6 +48,7 @@ export function TasksScreen({ tour = false }: { tour?: boolean }) {
   if (!data) return null;
   const { tasks, place } = data;
   const byId = new Map(tasks.classes.map((c) => [c.courseId, c]));
+  const order = dragged ?? tasks.classes.map((c) => c.courseId);
   const classes = order.map((id) => byId.get(id)).filter((c): c is ClassTasks => c !== undefined);
   const courseNames = new Map(tasks.classes.map((c) => [c.courseId, place(c.items[0]!.item.sectionId)?.course.name]));
 
