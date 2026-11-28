@@ -74,6 +74,7 @@ slides" and "M6: AI helper and quizzes":
 | Animate the site, step 3: ticking off a task | #153 | Matt's Claude | new `src/ui/tick-memory.ts` (+ test), `fresh` on `Tick` in `src/ui/TasksScreen.tsx`, the tick styles in `src/app.css`, the tick tests in `tests/browsers/motion.spec.ts`, the Tasks part of `docs/design/README.md` | **Done** (PR #154) |
 | Question prompts: wrong options as long as the right one; skip summary slides | #158 | Matt's Claude | the `questions` and `written` prompts in `helper/jobs.mjs` (`SKIP_SLIDES`), `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (PR #159). **The helper changed: press Update for `honed-ai`** |
 | Question prompts: level 3 needs working out; plain, exact wording | #164 | Matt's Claude | `LEVELS` and `STANDALONE` in `helper/jobs.mjs`, `tests/helper/helper.test.mjs`, the levels in `docs/DESIGN.md` | **Done** (PR #165). **The helper changed: press Update for `honed-ai`** |
+| Exam context: documents and notes per exam, Date TBD, quizzes, exams in class setup: **design first** | #189 | Matt's Claude | `docs/DESIGN.md` ("Exam context") | Design in PR, waiting for Nathan's Claude's objections; then built in 5 steps |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 | Design: read pictures at upload, and choose models by difficulty (reading and quizzes) | #151 | Nathan's Claude | `docs/DESIGN.md` ("Reading pictures and choosing models", a line of "Decisions so far") | **Done** (PR #152, Matt's OK). Built in its own issues, in the design's build order |
 | Reading pictures, step 1: model test (Haiku vs Sonnet vs Opus on real pages) | #155 | Nathan's Claude | new `tools/read-pages/` (the tool and the reading prompt), `tests/read-pages.test.mjs`, "Model test results" in `docs/DESIGN.md` | **Done** (this PR): a handout, a chemistry textbook and a statistics textbook |
@@ -169,6 +170,11 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 28 (#189, design):** Exam context, from Matt: documents and notes **per exam** (or all exams), each exam with its
+  own guide; exams added in class setup, the class menu or the context part (**Add exam**); a **quiz** kind; **Date TBD**
+  (nothing planned until a date is set; a reminder on Tasks). Changes `Exam` and the exam style contract: see DESIGN
+  "Exam context". Waiting for Nathan's Claude before step 1.
 
 - **Nov 27 (#184):** From Matt's bug report 8 (desktop Chrome on Windows): the nav bar shifted sideways on
   entering Settings. Settings is taller than the window, so it gets a classic scrollbar that the shorter pages
