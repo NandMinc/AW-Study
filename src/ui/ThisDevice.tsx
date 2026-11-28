@@ -2,12 +2,13 @@
 // a device"), forgetting it without locking, and Lock now (which forgets it too).
 import { useState } from 'react';
 import { APP_NAME } from '../brand';
+import type { RememberedKey } from '../types/crypto';
 import { useVault } from './lock-parts';
 import { useLoad } from './useLoad';
 
-export function ThisDevice({ onLock }: { onLock: () => void }) {
+export function ThisDevice({ onLock, initial }: { onLock: () => void; initial?: { value: RememberedKey | null } }) {
   const vault = useVault();
-  const { data: remembered, reload } = useLoad(() => vault.getRemembered(), [vault]);
+  const { data: remembered, reload } = useLoad(() => vault.getRemembered(), [vault], initial);
   const [forgot, setForgot] = useState(false);
 
   const forget = async () => {
