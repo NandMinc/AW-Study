@@ -10,7 +10,11 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0, // a flaky test gets fixed, never rerun until green
-  reporter: process.env.CI ? 'github' : 'list',
+  // TEST_TIMING_JSON (set by tools/test-timing.mjs, #192): also write each test's timing there
+  reporter: [
+    [process.env.CI ? 'github' : 'list'],
+    ...(process.env.TEST_TIMING_JSON ? [['json', { outputFile: process.env.TEST_TIMING_JSON }] as ['json', { outputFile: string }]] : []),
+  ],
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     // Reduced motion (#149): a test that measures a box or a colour never catches a page mid-slide. The tests of
