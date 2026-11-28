@@ -34,6 +34,12 @@ it chose, and Matt and Nathan may change it later.
 - **Shapes:** rounded, with outlines more than filled boxes. Buttons are pill-shaped and outlined in
   green; the selected thing is filled green.
 
+## App icon (#187)
+
+Two stacked cards with a tick (`public/icons/icon.svg`), in the look's colours: dark grey `#272727` behind, the
+nav pill's green `#9fe870` for the front card, the darker green `#3b7d1a` for the card behind it, and a dark grey
+tick. `npm run icons` draws the PNG sizes from it.
+
 ## Nav bar (all three main pages)
 
 A pill-shaped bar at the bottom with three icons: **Tasks** (a house), **Classes** (a stack of books;
