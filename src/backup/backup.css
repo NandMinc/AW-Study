@@ -1,17 +1,34 @@
 /* Backups (#18): the reminder banner and the Settings section. */
 
+/* Clear of the header's Lock button above it (#182: they touched) */
 .banner {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 1rem;
+  gap: 0.75rem 1rem;
+  margin: 0.75rem 0 1rem;
   padding: 0.75rem 1rem;
   border: 1px solid var(--accent);
   border-radius: 0.5rem;
 }
 
-.banner > span {
+.banner-text {
   flex: 1 1 14rem;
+}
+
+/* The actions stay together, on the right, and wrap as a group under the message on a phone */
+.banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+/* A little narrower than other buttons, so all three fit one row on a phone (an iPhone 15 has 327 px for them;
+   larger text sizes still wrap, as a group) */
+.banner-actions > button,
+.banner-actions > .button {
+  padding-inline: 0.7rem;
 }
 
 .warning {

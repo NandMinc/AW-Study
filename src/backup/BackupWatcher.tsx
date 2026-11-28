@@ -57,17 +57,14 @@ export function BackupWatcher({ store }: { store: BackupStore }) {
 
   if (problem) {
     return (
-      <Banner onDismiss={() => setDismissed(true)}>
-        <span>{problem}</span>
-      </Banner>
+      <Banner onDismiss={() => setDismissed(true)} message={problem} />
     );
   }
 
   if (state.folder && allowed === false) {
     return (
-      <Banner onDismiss={() => setDismissed(true)}>
-        <span>Automatic backups are paused: the browser needs your permission for “{state.folder.name}” again.</span>
-        <button type="button" onClick={async () => setAllowed(await allowFolderAgain(state.folder!))}>
+      <Banner onDismiss={() => setDismissed(true)} message={`Automatic backups are paused: the browser needs your permission for “${state.folder.name}” again.`}>
+        <button type="button" className="primary" onClick={async () => setAllowed(await allowFolderAgain(state.folder!))}>
           Allow
         </button>
       </Banner>
@@ -80,10 +77,13 @@ export function BackupWatcher({ store }: { store: BackupStore }) {
   if (!due) return null;
 
   return (
-    <Banner onDismiss={() => setDismissed(true)}>
-      <span>{state.last ? `Your last backup was ${ago(state.last.at, new Date())}.` : 'You haven’t made a backup yet.'}</span>
+    <Banner
+      onDismiss={() => setDismissed(true)}
+      message={state.last ? `Your last backup was ${ago(state.last.at, new Date())}.` : 'You haven’t made a backup yet.'}
+    >
       <button
         type="button"
+        className="primary"
         onClick={() =>
           backUpNow(store, preferredDelivery()).then(
             () => setDismissed(true),
@@ -93,18 +93,27 @@ export function BackupWatcher({ store }: { store: BackupStore }) {
       >
         Back up now
       </button>
-      <a href={href({ name: 'settings' })}>Settings</a>
+      <a className="button" href={href({ name: 'settings' })}>
+        Settings
+      </a>
     </Banner>
   );
 }
 
-function Banner({ children, onDismiss }: { children: ReactNode; onDismiss: () => void }) {
+/**
+ * The message, then its actions kept together on the right: the main one filled, the others outlined pills like
+ * every other button, Not now last (#182: they were a pill, plain text and an underlined link side by side).
+ */
+function Banner({ message, children, onDismiss }: { message: string; children?: ReactNode; onDismiss: () => void }) {
   return (
-    <div className="banner row" role="status" data-testid="backup-banner">
-      {children}
-      <button type="button" className="link" onClick={onDismiss}>
-        Not now
-      </button>
+    <div className="banner" role="status" data-testid="backup-banner">
+      <span className="banner-text">{message}</span>
+      <div className="banner-actions">
+        {children}
+        <button type="button" onClick={onDismiss}>
+          Not now
+        </button>
+      </div>
     </div>
   );
 }
