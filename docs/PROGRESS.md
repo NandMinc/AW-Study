@@ -88,6 +88,7 @@ slides" and "M6: AI helper and quizzes":
 | Settings draws once: nothing moves under a tap (the iPhone backup test timing out) | #92 | Nathan's Claude | the first-draw load in `src/ui/SettingsScreen.tsx`, `initial` in `src/ui/useLoad.ts`, `loadCompareChoices` and the `initialChoices` prop in `src/ui/AiSettings.tsx`, `initial` props on `SyncSettings`, `ThisDevice` and `BackupSettings`' Storage, new `tests/browsers/settings-stable.spec.ts` | **Done** (PR #179) |
 | The annotations test failing under load (iPhone, from #92) | #180 | Nathan's Claude | `tests/browsers/annotations.spec.ts` (one wait) | **Done** (PR #181): a test problem, not the app |
 | Backup banner: clear of Lock, matching actions (Matt's bug reports 6, 7) | #182 | Nathan's Claude | the `Banner` markup in `src/backup/BackupWatcher.tsx`, `src/backup/backup.css`, new `tests/browsers/backup-banner.spec.ts` | **Done** (this PR) |
+| Nav bar and page stay put when a page has a scrollbar (Matt's bug report 8) | #184 | Nathan's Claude | `scrollbar-gutter` on `html` in `src/app.css`, new `tests/browsers/scrollbar.spec.ts` | **Done** (this PR) |
 
 ## Milestones
 
@@ -174,7 +175,12 @@ the "Test and publish" run on `main` to finish, then press Update.
   tick), now dark grey `#272727` with a green `#9fe870` front card, a darker green `#3b7d1a` one behind and a dark
   grey tick; the PNGs redrawn with `npm run icons`, and the maker's background is the dark grey too. Phones may keep
   the old Home Screen icon until the app is added again.
-
+- **Nov 27 (#184):** From Matt's bug report 8 (desktop Chrome on Windows): the nav bar shifted sideways on
+  entering Settings. Settings is taller than the window, so it gets a classic scrollbar that the shorter pages
+  don't, and the viewport's 15 px loss moved everything centred by 7.5 px. Now `html` has `scrollbar-gutter: stable`,
+  so every page keeps the scrollbar's room. `scrollbar.spec.ts` (desktop only; phones' scrollbars take no space)
+  launches its own Chromium without Playwright's `--hide-scrollbars`, which otherwise hides this bug; it failed
+  without the fix (448 vs 440.5 px).
 - **Nov 27 (#182):** From Matt's bug reports 6 and 7 (desktop Chrome): the backup reminder touched the Lock button
   (0 px between them, on every device) and its actions were three styles (a pill, plain text, an underlined link).
   Now the banner has space above it, and its actions are one group on the right: Back up now filled, Settings and
@@ -786,6 +792,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Gotchas worth knowing
 
+- **The browser tests have no scrollbars** (#184): Playwright starts headless Chromium with `--hide-scrollbars`, so
+  anything a desktop scrollbar changes (the page getting narrower on long pages) never shows in the normal tests.
+  `scrollbar.spec.ts` launches its own Chromium without that flag: copy it for any test of that kind.
 - **A page must not grow under a tap** (#92): a section that loads its own data after the page is drawn pushes
   everything below it down, and a tap (a test's or a person's) lands where a button was. Playwright's "stable" check
   doesn't save you: the move can come between its check and the tap, mostly when the machine is busy. Load first,

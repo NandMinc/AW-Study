@@ -64,6 +64,12 @@
   box-sizing: border-box;
 }
 
+/* Every page keeps room for a scrollbar, so a long page (Settings) doesn't shift the nav bar and the page column
+   sideways on a computer whose scrollbars take space (#184). Phones' overlay scrollbars take none. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   background: var(--bg);
