@@ -88,6 +88,7 @@ slides" and "M6: AI helper and quizzes":
 | The annotations test failing under load (iPhone, from #92) | #180 | Nathan's Claude | `tests/browsers/annotations.spec.ts` (one wait) | **Done** (PR #181): a test problem, not the app |
 | Backup banner: clear of Lock, matching actions (Matt's bug reports 6, 7) | #182 | Nathan's Claude | the `Banner` markup in `src/backup/BackupWatcher.tsx`, `src/backup/backup.css`, new `tests/browsers/backup-banner.spec.ts` | **Done** (this PR) |
 | Nav bar and page stay put when a page has a scrollbar (Matt's bug report 8) | #184 | Nathan's Claude | `scrollbar-gutter` on `html` in `src/app.css`, new `tests/browsers/scrollbar.spec.ts` | **Done** (this PR) |
+| Tasks draws its real layout first (the iPhone practice test's missed tap) | #186 | Nathan's Claude | the class order in `src/ui/TasksScreen.tsx`, a test in `tests/browsers/practice.spec.ts` | **Done** (this PR) |
 
 ## Milestones
 
@@ -170,6 +171,13 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 27 (#186):** The iPhone practice test once missed its tap on the practice row after Done (a full run, under
+  load). Cause in the app: Tasks kept its class order in state set by an effect, starting as `[]`, so its first
+  draw was the "nothing today" layout (penguin, practice row at the top), and a render later the real one, with the
+  practice row rebuilt lower down. A tap between the two hit whatever moved into the row's place (a person could
+  see the penguin flash). Now the shown order is the dragged one or else the loaded one, so the first draw is the
+  real layout. The new practice test counts the row going into the page: 2 without the fix (all three devices,
+  every run), 1 with it, and no penguin.
 - **Nov 27 (#184):** From Matt's bug report 8 (desktop Chrome on Windows): the nav bar shifted sideways on
   entering Settings. Settings is taller than the window, so it gets a classic scrollbar that the shorter pages
   don't, and the viewport's 15 px loss moved everything centred by 7.5 px. Now `html` has `scrollbar-gutter: stable`,
@@ -790,6 +798,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **The browser tests have no scrollbars** (#184): Playwright starts headless Chromium with `--hide-scrollbars`, so
   anything a desktop scrollbar changes (the page getting narrower on long pages) never shows in the normal tests.
   `scrollbar.spec.ts` launches its own Chromium without that flag: copy it for any test of that kind.
+- **Never draw a stand-in first** (#186): state that an effect fills in from loaded data (`useState([])`, then
+  `setX(data…)` in `useEffect`) gives one draw with the stand-in, and the page swaps layouts under a tap. Work it
+  out from the data while rendering (`dragged ?? fromData`) and keep state only for what the user changed. A
+  MutationObserver counting how often an element goes into the page catches it every time (`practice.spec.ts`).
 - **A page must not grow under a tap** (#92): a section that loads its own data after the page is drawn pushes
   everything below it down, and a tap (a test's or a person's) lands where a button was. Playwright's "stable" check
   doesn't save you: the move can come between its check and the tap, mostly when the machine is busy. Load first,
