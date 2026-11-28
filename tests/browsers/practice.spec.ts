@@ -177,3 +177,36 @@ test('marking can be tried again once the AI is back; a blank answer gets 0 with
   expect(graded()).toBe(2); // nothing more sent
   expect((await problems()).filter((p) => !/status of 429/.test(p))).toEqual([]);
 });
+
+// #186: Tasks drew its first frame with no class order yet, so it took the "nothing today" layout (penguin, the
+// practice row at the top), then the real one a render later, rebuilding the practice row lower down. A tap that
+// landed between the two hit whatever had moved into the row's place (the iPhone test above, once, under load).
+// Now the first draw is the real layout: the row goes into the page once and the penguin never shows.
+test('Tasks draws its real layout first: the practice row goes in once, no penguin flash', async ({ page }) => {
+  await fakeHelper(page);
+  await page.addInitScript(() => {
+    const seen = { practice: 0, penguin: 0 };
+    (window as unknown as { seen: typeof seen }).seen = seen;
+    new MutationObserver((records) => {
+      for (const r of records)
+        for (const node of r.addedNodes) {
+          if (!(node instanceof Element)) continue;
+          const all = [node, ...node.querySelectorAll('*')];
+          seen.practice += all.filter((e) => e.matches('[data-testid="task-practice"]')).length;
+          seen.penguin += all.filter((e) => e.matches('.penguin, [data-testid="tasks-clear"], [data-testid="tasks-empty"]')).length;
+        }
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await finalOnFriday(page);
+  await expect(practiceRow(page)).toBeVisible();
+  const count = () => page.evaluate(() => (window as unknown as { seen: { practice: number; penguin: number } }).seen);
+  const before = await count(); // Tasks before any class (the empty page) counts here
+  await navBar(page).getByRole('link', { name: 'Classes' }).click();
+  await expect(practiceRow(page)).toBeHidden();
+  await navBar(page).getByRole('link', { name: 'Tasks' }).click();
+  await expect(page.getByTestId('task-class')).toBeVisible();
+  await expect(practiceRow(page)).toBeVisible();
+  const after = await count();
+  expect(after.practice - before.practice).toBe(1);
+  expect(after.penguin - before.penguin).toBe(0);
+});
