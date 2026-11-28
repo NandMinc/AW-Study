@@ -21,8 +21,8 @@ const page = (size, inner, background, radius) => `<!doctype html>
 const icons = [
   { name: 'icon-192.png', size: 192, inner: 192, background: 'transparent', radius: 0 },
   { name: 'icon-512.png', size: 512, inner: 512, background: 'transparent', radius: 0 },
-  { name: 'icon-maskable-512.png', size: 512, inner: 358, background: '#4f46e5', radius: 0 },
-  { name: 'apple-touch-icon.png', size: 180, inner: 180, background: '#4f46e5', radius: 0 },
+  { name: 'icon-maskable-512.png', size: 512, inner: 358, background: '#272727', radius: 0 },
+  { name: 'apple-touch-icon.png', size: 180, inner: 180, background: '#272727', radius: 0 },
 ];
 
 const browser = await chromium.launch();

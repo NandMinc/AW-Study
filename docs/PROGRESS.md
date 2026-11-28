@@ -74,6 +74,7 @@ slides" and "M6: AI helper and quizzes":
 | Animate the site, step 3: ticking off a task | #153 | Matt's Claude | new `src/ui/tick-memory.ts` (+ test), `fresh` on `Tick` in `src/ui/TasksScreen.tsx`, the tick styles in `src/app.css`, the tick tests in `tests/browsers/motion.spec.ts`, the Tasks part of `docs/design/README.md` | **Done** (PR #154) |
 | Question prompts: wrong options as long as the right one; skip summary slides | #158 | Matt's Claude | the `questions` and `written` prompts in `helper/jobs.mjs` (`SKIP_SLIDES`), `tests/helper/helper.test.mjs`, a line of `docs/DESIGN.md` | **Done** (PR #159). **The helper changed: press Update for `honed-ai`** |
 | Question prompts: level 3 needs working out; plain, exact wording | #164 | Matt's Claude | `LEVELS` and `STANDALONE` in `helper/jobs.mjs`, `tests/helper/helper.test.mjs`, the levels in `docs/DESIGN.md` | **Done** (PR #165). **The helper changed: press Update for `honed-ai`** |
+| App icon in the new colours: green on dark grey | #187 | Matt's Claude | `public/icons/` (the SVG and its PNGs), the background in `tools/make-icons.mjs`, the icon part of `docs/design/README.md` | **Done** (PR #188) |
 | UI design reference (`docs/design/`): the Tasks and Classes screens, colours, nav bar | #66 | Nathan's Claude | `docs/design/` | **Done** (this PR). The restyle follows in its own issues, in the README's order |
 | Design: read pictures at upload, and choose models by difficulty (reading and quizzes) | #151 | Nathan's Claude | `docs/DESIGN.md` ("Reading pictures and choosing models", a line of "Decisions so far") | **Done** (PR #152, Matt's OK). Built in its own issues, in the design's build order |
 | Reading pictures, step 1: model test (Haiku vs Sonnet vs Opus on real pages) | #155 | Nathan's Claude | new `tools/read-pages/` (the tool and the reading prompt), `tests/read-pages.test.mjs`, "Model test results" in `docs/DESIGN.md` | **Done** (this PR): a handout, a chemistry textbook and a statistics textbook |
@@ -171,6 +172,10 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 28 (#187):** The app icon was still the indigo one from before the restyle. Same picture (two cards and a
+  tick), now dark grey `#272727` with a green `#9fe870` front card, a darker green `#3b7d1a` one behind and a dark
+  grey tick; the PNGs redrawn with `npm run icons`, and the maker's background is the dark grey too. Phones may keep
+  the old Home Screen icon until the app is added again.
 - **Nov 27 (#186):** The iPhone practice test once missed its tap on the practice row after Done (a full run, under
   load). Cause in the app: Tasks kept its class order in state set by an effect, starting as `[]`, so its first
   draw was the "nothing today" layout (penguin, practice row at the top), and a render later the real one, with the
