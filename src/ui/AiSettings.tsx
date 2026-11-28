@@ -5,6 +5,8 @@
 import { useState } from 'react';
 import { AiError, type AiStatus } from '../ai/backend';
 import { signInUrl } from '../ai/http';
+import type { StudyStore } from '../db/store';
+import type { Section } from '../types/lecture';
 import { deviceTimeZone, studyDay } from '../lib/studyDay';
 import { useAi } from './ai-context';
 import { slidesLabel } from './classes';
@@ -16,11 +18,22 @@ import { messageOf, useLoad } from './useLoad';
 /** How many of the latest sections Compare models offers. */
 export const COMPARE_CHOICES = 5;
 
-export function AiSettings() {
+export type CompareChoice = { section: Section; course: string; deck: string };
+
+/** The latest sections Compare models offers, with their class and deck names. Settings loads it before drawing (#92). */
+export async function loadCompareChoices(store: StudyStore, today: string): Promise<CompareChoice[]> {
+  const [courses, sections] = await Promise.all([store.listCourses(today), store.listSections()]);
+  const latest = [...sections].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, COMPARE_CHOICES);
+  const decks = new Map((await Promise.all(courses.map((c) => store.listSlideDecks(c.id)))).flat().map((d) => [d.id, d]));
+  const names = new Map(courses.map((c) => [c.id, c.name]));
+  return latest.map((s) => ({ section: s, course: names.get(s.courseId) ?? 'Class', deck: decks.get(s.deckId)?.title ?? 'Slides' }));
+}
+
+export function AiSettings({ initialChoices }: { initialChoices?: { value: CompareChoice[] } }) {
   return (
     <>
       <AiSignIn />
-      <CompareChoices />
+      <CompareChoices initial={initialChoices} />
     </>
   );
 }
@@ -69,16 +82,10 @@ function AiSignIn() {
   );
 }
 
-function CompareChoices() {
+function CompareChoices({ initial }: { initial?: { value: CompareChoice[] } }) {
   const store = useStore();
   const today = studyDay(new Date(), deviceTimeZone(), DAY_START_HOUR);
-  const { data, error } = useLoad(async () => {
-    const [courses, sections] = await Promise.all([store.listCourses(today), store.listSections()]);
-    const latest = [...sections].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, COMPARE_CHOICES);
-    const decks = new Map((await Promise.all(courses.map((c) => store.listSlideDecks(c.id)))).flat().map((d) => [d.id, d]));
-    const names = new Map(courses.map((c) => [c.id, c.name]));
-    return latest.map((s) => ({ section: s, course: names.get(s.courseId) ?? 'Class', deck: decks.get(s.deckId)?.title ?? 'Slides' }));
-  }, [store, today]);
+  const { data, error } = useLoad(() => loadCompareChoices(store, today), [store, today], initial);
 
   return (
     <>

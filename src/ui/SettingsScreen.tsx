@@ -8,7 +8,11 @@ import { BackupSettings } from '../backup/BackupSettings';
 import { AccountSettings } from '../sync/AccountSettings';
 import { GoogleUnlockSettings } from '../sync/GoogleUnlockSettings';
 import { SyncSettings } from '../sync/SyncSettings';
-import { AiSettings } from './AiSettings';
+import { AiSettings, loadCompareChoices } from './AiSettings';
+import { storageState } from '../backup/persist';
+import { deviceTimeZone, studyDay } from '../lib/studyDay';
+import type { StudySettings } from '../types/plan';
+import { DAY_START_HOUR } from './settings';
 import { ThisDevice } from './ThisDevice';
 import { href } from './route';
 import { APP_NAME } from '../brand';
@@ -43,6 +47,20 @@ export function SettingsScreen({ onLock, onReplaced = () => {} }: { onLock: () =
   const store = useStore();
   const prf = usePrfSupported();
   const { data: keyring, error, reload } = useLoad(() => vault.getKeyring(), [vault]);
+  // What the sections below load for themselves, loaded once before the page is drawn and handed to them, so
+  // the page doesn't grow under a tap as each one arrives (#92: on an iPhone the Restore button moved ~470 px
+  // within 0.1 s of appearing, and a tap landed where it had been). They still load again on mount, as before.
+  const { data: first, error: firstError } = useLoad(async () => {
+    const today = studyDay(new Date(), deviceTimeZone(), DAY_START_HOUR);
+    const [study, sync, choices, remembered, storage] = await Promise.all([
+      store.getStudySettings(),
+      store.getSyncState(),
+      loadCompareChoices(store, today),
+      vault.getRemembered(),
+      storageState().catch(() => undefined),
+    ]);
+    return { study, sync, choices, remembered, storage };
+  }, [store, vault]);
   const [task, setTask] = useState<Task | null>(null);
   const [changeKey, setChangeKey] = useState<CryptoKey | null>(null);
   const [removing, setRemoving] = useState<{ id: string; label: string } | null>(null);
@@ -66,8 +84,8 @@ export function SettingsScreen({ onLock, onReplaced = () => {} }: { onLock: () =
     setChangeKey(null);
   };
 
-  if (error) return <p className="error">{error}</p>;
-  if (!keyring) return <p className="muted">Loading…</p>;
+  if (error || firstError) return <p className="error">{error ?? firstError}</p>;
+  if (!keyring || !first) return <p className="muted">Loading…</p>;
   const passkeys = passkeyEntries(keyring);
 
   return (
@@ -78,7 +96,7 @@ export function SettingsScreen({ onLock, onReplaced = () => {} }: { onLock: () =
 
       <ThemeSetting />
 
-      <StudyTimeSetting />
+      <StudyTimeSetting initial={first.study} />
 
       <h3>How you unlock</h3>
       <ul className="list" aria-label="Ways to unlock">
@@ -137,22 +155,23 @@ export function SettingsScreen({ onLock, onReplaced = () => {} }: { onLock: () =
         </p>
       )}
 
-      <AiSettings />
+      <AiSettings initialChoices={{ value: first.choices }} />
 
       <AccountSettings />
 
       {keyring && <GoogleUnlockSettings keyring={keyring} onChanged={() => reload()} />}
 
       <SyncSettings
+        initial={{ value: first.sync }}
         onReplaced={() => {
           void reload();
           onReplaced();
         }}
       />
 
-      <BackupSettings store={store} onRestored={() => void reload()} />
+      <BackupSettings store={store} onRestored={() => void reload()} initialStorage={first.storage} />
 
-      <ThisDevice onLock={onLock} />
+      <ThisDevice onLock={onLock} initial={{ value: first.remembered }} />
 
       <BugButtonSetting />
 
@@ -397,9 +416,9 @@ function ThemeSetting() {
 }
 
 /** The daily study minutes the planner fills (moved here from the Tasks page, which shows no times, #77). */
-function StudyTimeSetting() {
+function StudyTimeSetting({ initial }: { initial: StudySettings }) {
   const store = useStore();
-  const { data, error } = useLoad(() => store.getStudySettings(), [store]);
+  const { data, error } = useLoad(() => store.getStudySettings(), [store], { value: initial });
   const [value, setValue] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; problem: boolean } | null>(null);
   if (error) return <p className="error">{error}</p>;

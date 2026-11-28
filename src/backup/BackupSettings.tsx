@@ -11,7 +11,15 @@ import { RestoreBackup } from './RestoreBackup';
 import { saveFolder } from './state';
 import './backup.css';
 
-export function BackupSettings({ store, onRestored }: { store: BackupStore; onRestored: () => void }) {
+export function BackupSettings({
+  store,
+  onRestored,
+  initialStorage,
+}: {
+  store: BackupStore;
+  onRestored: () => void;
+  initialStorage?: StorageState;
+}) {
   const { state } = useBackupState();
   const [restoring, setRestoring] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -151,13 +159,13 @@ export function BackupSettings({ store, onRestored }: { store: BackupStore; onRe
         </p>
       )}
 
-      <StorageSection />
+      <StorageSection initial={initialStorage} />
     </div>
   );
 }
 
-function StorageSection() {
-  const [state, setState] = useState<StorageState | null>(null);
+function StorageSection({ initial }: { initial?: StorageState }) {
+  const [state, setState] = useState<StorageState | null>(initial ?? null);
   const [asking, setAsking] = useState(false);
   const refresh = () => storageState().then(setState, () => {});
   useEffect(() => {

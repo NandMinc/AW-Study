@@ -2,8 +2,10 @@
 // so a slow old answer never overwrites a newer one.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export function useLoad<T>(load: () => Promise<T>, deps: readonly unknown[]) {
-  const [data, setData] = useState<T | undefined>(undefined);
+// `initial` is a value already loaded by the screen (Settings loads its sections' data before it draws, so
+// nothing moves under a tap afterwards, #92): shown at once, and loaded again on mount as usual.
+export function useLoad<T>(load: () => Promise<T>, deps: readonly unknown[], initial?: { value: T }) {
+  const [data, setData] = useState<T | undefined>(initial ? initial.value : undefined);
   const [error, setError] = useState<string | null>(null);
   const latest = useRef(0);
   const run = useCallback(load, deps);

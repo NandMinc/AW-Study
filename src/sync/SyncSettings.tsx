@@ -2,6 +2,7 @@
 // it on when the account already has data made under another key asks before replacing this device's data.
 import { useState } from 'react';
 import { APP_NAME } from '../brand';
+import type { SyncState } from '../db/sync';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useVault } from '../ui/lock-parts';
 import { useStore } from '../ui/store-context';
@@ -10,10 +11,10 @@ import { accountStatus } from './client';
 import { joinWithKey, startSync, stopSync, syncOnce, type AccountKeyring } from './engine';
 import { JoinUnlock } from './JoinUnlock';
 
-export function SyncSettings({ onReplaced }: { onReplaced: () => void }) {
+export function SyncSettings({ onReplaced, initial }: { onReplaced: () => void; initial?: { value: SyncState | null } }) {
   const store = useStore();
   const vault = useVault();
-  const { data: state, reload } = useLoad(() => store.getSyncState(), [store]);
+  const { data: state, reload } = useLoad(() => store.getSyncState(), [store], initial);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [replacing, setReplacing] = useState<{ account: AccountKeyring; email: string } | null>(null);

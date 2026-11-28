@@ -84,6 +84,7 @@ slides" and "M6: AI helper and quizzes":
 | Reading pictures, step 6: questions by difficulty with the blind check (6a helper rounds, 6b app) | #172 | Nathan's Claude | 6b: `src/reading/work.ts` (the bank plan, text pages, filing questions), `src/reading/work.test.ts`; 6a: `questionRounds` in `helper/rounds.mjs`, the question plan and quick rounds in `helper/queue.mjs`, `helper/server.mjs`, `tests/helper/questions.test.mjs` | **Done**: 6a (PR #173), 6b (this PR). Live once `site-honed` updates |
 | Reading pictures, step 7: Explain, Ask and Box use the readings, a page read now | #175 | Nathan's Claude | `helper/jobs.mjs` (pictures for explain/ask, the `read` job), `readPage` in `helper/rounds.mjs`, `helper/app.mjs`; `src/ai/` (`readPage`, pictures), new `src/reading/explain.ts`, `drawAreaPng` in `src/reading/scan.ts`, `prepare` in `src/viewer/AnnotatedViewer.tsx`, `src/ui/DeckSlides.tsx` | **Done** (this PR) |
 | Reading pictures, step 8: the quiz button while questions are being written | #177 | Nathan's Claude | new `src/reading/pending.ts` (+ test), new `src/ui/QuizWaiting.tsx`, the Quiz link in `src/ui/TasksScreen.tsx`, the start part of `src/ui/QuizScreen.tsx`, `neededBy` in `src/db/work.ts`, `.link-button` in `src/app.css`, a test in `tests/browsers/play.spec.ts` | **Done** (this PR). The build plan of "Reading pictures and choosing models" is finished |
+| Settings draws once: nothing moves under a tap (the iPhone backup test timing out) | #92 | Nathan's Claude | the first-draw load in `src/ui/SettingsScreen.tsx`, `initial` in `src/ui/useLoad.ts`, `loadCompareChoices` and the `initialChoices` prop in `src/ui/AiSettings.tsx`, `initial` props on `SyncSettings`, `ThisDevice` and `BackupSettings`' Storage, new `tests/browsers/settings-stable.spec.ts` | **Done** (this PR) |
 
 ## Milestones
 
@@ -165,6 +166,15 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 27 (#92):** The iPhone backup test that timed out under load (`backup.spec.ts`, Nov 20 and 22) was a real
+  layout shift: Settings drew, then Study time, Sync, Compare models and Storage each filled in from their own loads,
+  and on WebKit the "Restore from a backup…" button moved ~470 px within 0.1 s of appearing (measured frame by frame),
+  so the tap landed where it had been. A person tapping on a slow phone would miss the same way. Settings now loads
+  what those sections need before it draws and hands it to them (`useLoad`'s new `initial`; they still load again on
+  mount). `settings-stable.spec.ts` records every heading's and button's place each frame from the first draw and
+  fails if any moves (it slows the storage estimate so the old code fails on all three devices: proved against the
+  old build). The `annotations.spec.ts:109` sightings in #92 weren't looked at: if it recurs, check for the same thing.
 
 - **Nov 27 (#177):** A quiz whose questions are being written in the background (sent by this device, not given up on,
   bank still empty): on Tasks its Quiz looks greyed out but still answers a tap (aria-disabled), opening "Your quiz is
@@ -752,6 +762,11 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **Nov 17:** Skeleton merged (#2). Design merged (#1).
 
 ## Gotchas worth knowing
+
+- **A page must not grow under a tap** (#92): a section that loads its own data after the page is drawn pushes
+  everything below it down, and a tap (a test's or a person's) lands where a button was. Playwright's "stable" check
+  doesn't save you: the move can come between its check and the tap, mostly when the machine is busy. Load first,
+  then draw (as Settings does), or keep the space the same while loading. `settings-stable.spec.ts` shows how to test it.
 
 - **Browser tests run with reduced motion** (#149, `playwright.config.ts`): no page slides or pill movement, so a
   test that measures a box or a colour never catches a screen mid-slide. A test of motion turns it back on with
