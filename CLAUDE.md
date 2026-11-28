@@ -64,8 +64,10 @@ TypeScript, React 19, Vite 8 (with vite-plugin-pwa), Vitest, Playwright. Node 24
 | --- | --- |
 | `npm install` then `npx playwright install chromium webkit` | First-time setup |
 | `npm run dev` | Dev server with live reload (no service worker in dev) |
-| `npm test` | Everything: unit tests, type check, build, browser tests (desktop, Android, iPhone) |
-| `npm run test:unit` | Vitest only (`src/**/*.test.ts`, `tests/**/*.test.mjs`), under a second |
+| `npm test` | Everything: unit tests alongside type check, build, browser tests (desktop, Android, iPhone); ~100 s. Run it before every PR |
+| `npm test -- <spec> --project=desktop` | The quick loop while working (#192): the unit tests plus one spec on one device, ~10 s; either part alone ~20 s. Playwright's arguments pass through |
+| `node tools/test-timing.mjs [--runs N] [-- <command>]` | How long the tests take and where the time goes, median of N runs: measure before and after a change to the tests |
+| `npm run test:unit` | Vitest only (`src/**/*.test.ts`, `tests/**/*.test.mjs`), ~9 s |
 | `npm run build` then `npm run serve` | The production build on http://127.0.0.1:8091 with the real headers |
 | `npm run icons` | Redraw the PNG icons from `public/icons/icon.svg` |
 

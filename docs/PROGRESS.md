@@ -90,6 +90,7 @@ slides" and "M6: AI helper and quizzes":
 | Backup banner: clear of Lock, matching actions (Matt's bug reports 6, 7) | #182 | Nathan's Claude | the `Banner` markup in `src/backup/BackupWatcher.tsx`, `src/backup/backup.css`, new `tests/browsers/backup-banner.spec.ts` | **Done** (this PR) |
 | Nav bar and page stay put when a page has a scrollbar (Matt's bug report 8) | #184 | Nathan's Claude | `scrollbar-gutter` on `html` in `src/app.css`, new `tests/browsers/scrollbar.spec.ts` | **Done** (this PR) |
 | Tasks draws its real layout first (the iPhone practice test's missed tap) | #186 | Nathan's Claude | the class order in `src/ui/TasksScreen.tsx`, a test in `tests/browsers/practice.spec.ts` | **Done** (this PR) |
+| Faster test runs, measured step by step | #192 | Nathan's Claude | `tests/browsers/fixtures.ts` (`fastKdf`, `realKdf`), the extra contexts in `backup.spec.ts`, `sync.spec.ts`, `scrollbar.spec.ts`, `lock.spec.ts`, `playwright.config.ts` (timing report), `package.json` `test`, new `tools/run-tests.mjs`, `tools/test-timing.mjs`, the commands table in `CLAUDE.md` | **Done** (this PR) |
 
 ## Milestones
 
@@ -172,6 +173,15 @@ the "Test and publish" run on `main` to finish, then press Update.
 
 ## Log (newest first)
 
+- **Nov 27 (#192):** Faster tests, each step measured with the new `tools/test-timing.mjs` (median of 3 full runs on
+  Nathan's PC, 12 browsers at once). Baseline `npm test` 119.3 s; the iPhone (WebKit) project was 69% of browser test time.
+  (1) PBKDF2 at 1,000 rounds inside the test browser (`fastKdf` in `fixtures.ts`; the app and what it stores are
+  unchanged; `lock.spec.ts` keeps the real 600,000 and checks WebCrypto is the browser's own there): 107.9 s (-11.4 s;
+  iPhone test time 827 to 714 s per run). (2) Unit tests alongside the browser tests (`tools/run-tests.mjs`; a broken
+  unit test still fails `npm test`, checked): 100.1 s (-7.8 s; the browser tests' own time unchanged). (3) The quick
+  loop, Playwright's arguments through `npm test --`: `--project=desktop` 20.8 s, one spec on every device 19.8 s, one
+  spec on desktop 9.6 s. Total: the full run 119.3 to 100.1 s (-16%). Still the iPhone project sets the wall time; next
+  candidate: starting tests from a ready-made database instead of clicking through setup.
 - **Nov 28 (#187):** The app icon was still the indigo one from before the restyle. Same picture (two cards and a
   tick), now dark grey `#272727` with a green `#9fe870` front card, a darker green `#3b7d1a` one behind and a dark
   grey tick; the PNGs redrawn with `npm run icons`, and the maker's background is the dark grey too. Phones may keep
@@ -803,6 +813,9 @@ the "Test and publish" run on `main` to finish, then press Update.
 - **The browser tests have no scrollbars** (#184): Playwright starts headless Chromium with `--hide-scrollbars`, so
   anything a desktop scrollbar changes (the page getting narrower on long pages) never shows in the normal tests.
   `scrollbar.spec.ts` launches its own Chromium without that flag: copy it for any test of that kind.
+- **Test browsers run PBKDF2 at 1,000 rounds** (#192, `fastKdf` in `fixtures.ts`): every context in one test must
+  match, so a test that makes another context calls `fastKdf(context)` on it too (or a keyring or backup made in one
+  won't open in the other: it fails as a wrong passphrase). A test that needs the real cost uses `test.use({ realKdf: true })`.
 - **Never draw a stand-in first** (#186): state that an effect fills in from loaded data (`useState([])`, then
   `setX(data…)` in `useEffect`) gives one draw with the stand-in, and the page swaps layouts under a tap. Work it
   out from the data while rendering (`dragged ?? fromData`) and keep state only for what the user changed. A
