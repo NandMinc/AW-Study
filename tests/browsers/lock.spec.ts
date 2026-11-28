@@ -17,6 +17,15 @@ import {
 import { makePdf } from '../../src/viewer/test-pdf';
 import { addClass, addClassAndReturn, pdfFile } from './class-helpers';
 
+// The real cost (#192): every other test runs PBKDF2 at 1,000 rounds (fixtures.ts fastKdf); setup and unlock here
+// run the app's 600,000 on every device.
+test.use({ realKdf: true });
+
+test('the lock tests run with the browser’s own WebCrypto, at the real rounds', async ({ page }) => {
+  await page.goto('/');
+  expect(await page.evaluate(() => String(crypto.subtle.deriveKey))).toContain('[native code]');
+});
+
 function watchErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(`page error: ${e.message}`));

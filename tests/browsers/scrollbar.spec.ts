@@ -6,7 +6,7 @@
 // Playwright's headless Chromium hides scrollbars (--hide-scrollbars), which hides this bug, so the test launches
 // its own Chromium without that flag. Phones (the Android and iPhone projects) have overlay scrollbars that take
 // no space, so this is desktop only.
-import { expect, test } from './fixtures';
+import { expect, fastKdf, test } from './fixtures';
 import { navBar } from './class-helpers';
 import { openUnlocked } from './lock-helpers';
 
@@ -18,6 +18,7 @@ test('the nav bar and the page stay put between a short page and a long one with
     const { baseURL, storageState, contextOptions } = testInfo.project.use;
     // Short enough that Settings scrolls and the empty Tasks page doesn't
     const context = await browser.newContext({ ...contextOptions, baseURL, storageState, viewport: { width: 1280, height: 720 } });
+    await fastKdf(context);
     const page = await context.newPage();
     await openUnlocked(page);
     const nav = navBar(page);
