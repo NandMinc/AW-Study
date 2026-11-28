@@ -6,7 +6,7 @@
 // picker (showDirectoryPicker), so the folder logic is unit-tested with a fake folder instead
 // (src/backup/folder.test.ts).
 import { readFile } from 'node:fs/promises';
-import { expect, keepDrawing, test, type Page } from './fixtures';
+import { expect, fastKdf, keepDrawing, test, type Page } from './fixtures';
 import { PASSPHRASE, setUpWithPassphrase, unlockWithPassphrase } from './lock-helpers';
 import { addClassAndReturn, toClasses } from './class-helpers';
 
@@ -57,6 +57,7 @@ test('download a backup with no plaintext in it, then restore it on a new device
   // A new device: an empty browser with the same screen
   const other = await browser.newContext(test.info().project.use);
   await keepDrawing(other, browserName);
+  await fastKdf(other); // the same rounds as the first device (fixtures.ts)
   const fresh = await other.newPage();
   const freshErrors = watchErrors(fresh);
   await fresh.goto('/');

@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { expect, test, type Page } from './fixtures';
+import { expect, fastKdf, test, type Page } from './fixtures';
 import { addClass, addClassAndReturn, navBar, pdfFile } from './class-helpers';
 import { numberedSlides } from '../../src/viewer/test-pdf';
 import { PASSPHRASE, setUpWithPassphrase } from './lock-helpers';
@@ -114,6 +114,7 @@ test('a class made on the PC reaches a new phone that joins; the phone’s class
 
     // A new phone joins from setup with the account's passphrase, and gets the class
     const phoneContext = await browser.newContext({ ...info.project.use, serviceWorkers: 'block' });
+    await fastKdf(phoneContext); // the same rounds as the PC (fixtures.ts)
     const phone = await phoneContext.newPage();
     const phoneErrors = watchErrors(phone);
     await server.connect(phone);
@@ -162,7 +163,9 @@ test('a device with its own data is asked before it’s replaced with the accoun
     await expect(page.getByTestId('sync-message')).toContainText('Sync is on');
 
     // A second device set up on its own (its own key and data)
-    const other = await (await browser.newContext({ ...info.project.use, serviceWorkers: 'block' })).newPage();
+    const otherContext = await browser.newContext({ ...info.project.use, serviceWorkers: 'block' });
+    await fastKdf(otherContext); // the same rounds as the PC (fixtures.ts)
+    const other = await otherContext.newPage();
     await server.connect(other);
     await other.goto('/');
     await setUpWithPassphrase(other, 'a different passphrase here');
@@ -216,6 +219,7 @@ test('slides added on the PC open on the phone: the PDF comes across when they�
 
     // The phone joins and opens the slides: the PDF is fetched then, and the viewer shows it
     const phoneContext = await browser.newContext({ ...info.project.use, serviceWorkers: 'block' });
+    await fastKdf(phoneContext); // the same rounds as the PC (fixtures.ts)
     const phone = await phoneContext.newPage();
     const phoneErrors = watchErrors(phone);
     await server.connect(phone);

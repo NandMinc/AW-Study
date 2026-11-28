@@ -36,11 +36,46 @@ export async function answerStyle(context: BrowserContext): Promise<void> {
   );
 }
 
-/** Every test's own context gets both; a test that makes another context calls them itself. */
-export const test = base.extend({
-  context: async ({ context, browserName }, use) => {
+/** The app's PBKDF2 rounds for a passphrase (src/lib/crypto.ts PBKDF2_ITERATIONS), and what the tests use instead. */
+export const REAL_ROUNDS = 600_000;
+export const TEST_ROUNDS = 1_000;
+
+/**
+ * Cheaper passphrases (#192): inside the test browser, PBKDF2 at the app's 600,000 rounds runs 1,000 instead. Setting
+ * up or unlocking was ~1.5 s of every iPhone test (WebKit is slow at it) and ~0.3 s elsewhere, in nearly every test.
+ * The app is unchanged and what it stores still says 600,000; only this browser's WebCrypto is wrapped, so setup
+ * and unlock stay consistent. Every context in one test must match: a keyring or backup made at 1,000 rounds won't
+ * open in a context with the real count (it fails loudly, as a wrong passphrase). lock.spec.ts keeps the real rounds
+ * (`test.use({ realKdf: true })`), so the real cost is still tested on every device.
+ */
+export async function fastKdf(context: BrowserContext): Promise<void> {
+  await context.addInitScript(
+    ([real, cheap]) => {
+      const subtle = globalThis.crypto?.subtle;
+      if (!subtle) return;
+      const cheaper = <T,>(algorithm: T): T => {
+        const a = algorithm as { name?: string; iterations?: number };
+        return a && typeof a === 'object' && a.name === 'PBKDF2' && a.iterations === real ? ({ ...a, iterations: cheap } as T) : algorithm;
+      };
+      const deriveKey = subtle.deriveKey.bind(subtle);
+      const deriveBits = subtle.deriveBits.bind(subtle);
+      subtle.deriveKey = ((algorithm, ...rest) => deriveKey(cheaper(algorithm), ...rest)) as typeof subtle.deriveKey;
+      subtle.deriveBits = ((algorithm, ...rest) => deriveBits(cheaper(algorithm), ...rest)) as typeof subtle.deriveBits;
+    },
+    [REAL_ROUNDS, TEST_ROUNDS] as const,
+  );
+}
+
+/**
+ * Every test's own context gets keepDrawing, answerStyle and (unless the test uses `realKdf`) fastKdf; a test that
+ * makes another context calls them itself, with the same choice of rounds.
+ */
+export const test = base.extend<{ realKdf: boolean }>({
+  realKdf: [false, { option: true }],
+  context: async ({ context, browserName, realKdf }, use) => {
     await keepDrawing(context, browserName);
     await answerStyle(context);
+    if (!realKdf) await fastKdf(context);
     await use(context);
   },
 });
