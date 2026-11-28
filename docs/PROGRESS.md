@@ -85,7 +85,8 @@ slides" and "M6: AI helper and quizzes":
 | Reading pictures, step 7: Explain, Ask and Box use the readings, a page read now | #175 | Nathan's Claude | `helper/jobs.mjs` (pictures for explain/ask, the `read` job), `readPage` in `helper/rounds.mjs`, `helper/app.mjs`; `src/ai/` (`readPage`, pictures), new `src/reading/explain.ts`, `drawAreaPng` in `src/reading/scan.ts`, `prepare` in `src/viewer/AnnotatedViewer.tsx`, `src/ui/DeckSlides.tsx` | **Done** (this PR) |
 | Reading pictures, step 8: the quiz button while questions are being written | #177 | Nathan's Claude | new `src/reading/pending.ts` (+ test), new `src/ui/QuizWaiting.tsx`, the Quiz link in `src/ui/TasksScreen.tsx`, the start part of `src/ui/QuizScreen.tsx`, `neededBy` in `src/db/work.ts`, `.link-button` in `src/app.css`, a test in `tests/browsers/play.spec.ts` | **Done** (this PR). The build plan of "Reading pictures and choosing models" is finished |
 | Settings draws once: nothing moves under a tap (the iPhone backup test timing out) | #92 | Nathan's Claude | the first-draw load in `src/ui/SettingsScreen.tsx`, `initial` in `src/ui/useLoad.ts`, `loadCompareChoices` and the `initialChoices` prop in `src/ui/AiSettings.tsx`, `initial` props on `SyncSettings`, `ThisDevice` and `BackupSettings`' Storage, new `tests/browsers/settings-stable.spec.ts` | **Done** (PR #179) |
-| The annotations test failing under load (iPhone, from #92) | #180 | Nathan's Claude | `tests/browsers/annotations.spec.ts` (one wait) | **Done** (this PR): a test problem, not the app |
+| The annotations test failing under load (iPhone, from #92) | #180 | Nathan's Claude | `tests/browsers/annotations.spec.ts` (one wait) | **Done** (PR #181): a test problem, not the app |
+| Backup banner: clear of Lock, matching actions (Matt's bug reports 6, 7) | #182 | Nathan's Claude | the `Banner` markup in `src/backup/BackupWatcher.tsx`, `src/backup/backup.css`, new `tests/browsers/backup-banner.spec.ts` | **Done** (this PR) |
 
 ## Milestones
 
@@ -167,6 +168,13 @@ the "Test and publish" run on `main` to finish, then press Update.
   the app. v2 adds end-to-end encrypted sync.
 
 ## Log (newest first)
+
+- **Nov 27 (#182):** From Matt's bug reports 6 and 7 (desktop Chrome): the backup reminder touched the Lock button
+  (0 px between them, on every device) and its actions were three styles (a pill, plain text, an underlined link).
+  Now the banner has space above it, and its actions are one group on the right: Back up now filled, Settings and
+  Not now outlined pills, a little narrower so all three fit one row on an iPhone 15 (larger text sizes wrap them
+  as a group). The "Allow" action of the folder banner is filled too. `backup-banner.spec.ts` checks the gap and that
+  the actions match (proved: the gap check fails on the old CSS, the matching check on the old markup).
 
 - **Nov 27 (#180):** `[iphone] annotations.spec.ts:109` reproduced under load: 3 failures in 48 runs (12 at once),
   each a tap in the notes panel that did nothing ("Delete" opened no confirm, or "Delete for good" deleted nothing).
