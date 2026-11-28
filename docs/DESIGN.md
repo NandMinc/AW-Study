@@ -327,6 +327,73 @@ helper as AI inputs, never stored there.
    its feedback and the points of a full answer on the results. If marking fails: Try marking again, or Save without
    them (they don't count). The results' percentage is the weighted score (it was the plain one until #124).
 
+## Exam context (#189, designed Nov 28 with Matt, not built)
+
+Matt, Nov 28: a student hears things about each exam ("the final is non-cumulative", "the midterm is on topics 1-10",
+"the exam is all multiple choice") and gets documents for it (a practice test, a topic list). Telling Honed should
+shape the questions **for that exam**. Today's Exam style part (#122) holds a class's documents and notes and one
+guide for the whole class. This makes them per exam, and makes exams easier to add.
+
+**Exams**
+
+- Kinds: **midterm, final, test and quiz** (quiz is new).
+- A date, or **Date TBD** (`date: null`), for exams scheduled in a window, like finals. Shown as "Date TBD".
+  - Until a date is entered, nothing is planned for it: no run-up (#86), no practice (#87).
+  - Tasks reminds you once the date is likely known: "BIO 110's Final has no date yet. Add it", from 4 weeks before
+    the class's term end (or always, when the class has no term end), until a date is set.
+  - What a TBD exam covers: its chosen lectures, or (null) every lecture of the class, with no date to stop at.
+- Added in three places, all through the same exam form (title, kind, date or Date TBD, what it covers):
+  1. **Class setup**: an **Exams** section in the new class form, to add any number (each a row: title, kind, date
+     or TBD). Optional, and coverage starts as every lecture up to the date.
+  2. **The class menu's Exams part**, as today, now with quiz and Date TBD.
+  3. **The exam context part**, through **Add exam** (below), which picks the new exam once it's saved.
+- Context like "the midterm is on topics 1-10" doesn't change what an exam covers (Matt, Nov 28): coverage stays the
+  student's choice in the exam form.
+
+**Exam context** (the class page's Exam style part, renamed **Exam context**)
+
+- At the top, **Which exam is this about?**: **All exams** (the class as a whole), or one of the class's exams, by
+  title and date. And **Add exam**, which opens the exam form and then picks the new exam.
+- For the exam picked, two ways to add context:
+  - **Document**: a **Choose file** button (PDF or plain text, as today) and a line saying what helps: a practice
+    test, a past exam, a topic list or outline. The student says what it is (practice test or past exam, topic list
+    or outline, other).
+  - **What you've heard**: a text box: "Anything your prof said about this exam: what it covers, the format, what's
+    allowed". Saved per exam (or for all exams).
+- Under them: that exam's documents (edit the title or kind, move it to another exam, delete) and its guide.
+
+**A guide per exam** (Matt, Nov 28)
+
+- Each exam gets its **own guide**, made from the class-wide context, that exam's own documents and notes, and the
+  slides of the lectures it covers. The class keeps a class-wide guide too, from the class-wide context and all the
+  slides, for lectures no upcoming exam covers.
+- **Which guide a lecture's questions follow**: the soonest upcoming exam that covers the lecture (dated exams by
+  date, then TBD ones); none, the class guide. Exam practice uses its exam's guide.
+- Made only when the student acts, as today (SECURITY.md: nothing is sent unless asked): adding or deleting a
+  document or saving notes for an exam remakes **that exam's** guide; class-wide context remakes the class guide
+  and every exam's. Opening the page sends nothing. A guide is out of date by the same rules as today
+  (`src/quiz/guide.ts`), counting only the lectures its exam covers.
+- Cost: one style job per exam with context, instead of one per class. A class with three exams and no exam-specific
+  context still has just the class guide (an exam with no context of its own follows the class guide).
+
+**What changes in the shared contract** (in their own PR, announced in the issues)
+
+- `src/types/lecture.ts`: `ExamKind` gains `'quiz'`; `Exam.date` becomes `string | null` (null: Date TBD).
+- `src/types/style.ts`: `ClassMaterial.examId: string | null` (null: all exams); `ExamStyle` becomes one per class
+  **and exam** (`examId: string | null`), each with its notes and guide; the store methods take `(courseId, examId)`.
+  Existing styles and materials become the class-wide ones (`examId: null`). Deleting an exam moves its documents
+  and notes to the class-wide context (never deleted with it), and deletes its guide.
+- Sync carries the new fields as part of the sealed records (nothing new in clear on the server).
+
+**Build steps**
+
+1. Contract and storage: the types above, the migration (existing records → `examId: null`), the store methods, sync.
+2. Planner: TBD exams have no run-up or practice; the Tasks reminder.
+3. Exams: the exam form's quiz and Date TBD; the Exams section in class setup.
+4. The Exam context part: the exam picker with Add exam, the document button and the notes box per exam.
+5. Per-exam guides: making them (the style job gets the exam's context), choosing a lecture's guide when making
+   questions, exam practice with its exam's guide.
+
 ## The slide viewer
 
 Slides are shown exactly as the PDF draws them, with your notes and highlights on top, and AI help one tap away.
